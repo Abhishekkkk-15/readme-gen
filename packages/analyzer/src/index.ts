@@ -4,5 +4,6 @@ export * from './analyzers/route.extractor';
 export * from './analyzers/env.extractor';
 export * from './analyzers/package.parser';
 export * from './analyzers/ast-feature.detector';
+export * from './analyzers/definition.extractor';
 export * from './types';
 export * from './utils/scanner';

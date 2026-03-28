@@ -22,11 +22,31 @@ export const analyzeRepository = async (req: Request, res: Response): Promise<vo
   }
 };
 
+export const getRecommendations = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { analysis, provider } = req.body;
+    if (!analysis) {
+      res.status(400).json({ error: 'Analysis data is required for recommendations' });
+      return;
+    }
+
+    const recommendations = await llmService.getRecommendations(
+      analysis,
+      provider === 'gemini' ? 'gemini' : 'groq'
+    );
+
+    res.status(200).json(recommendations);
+  } catch (error: any) {
+    console.error('Error getting recommendations:', error);
+    res.status(500).json({ error: error.message || 'Failed to get recommendations' });
+  }
+};
+
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields } = req.body;
     const user = (req as any).user;
-    
+
     if (!title && !repoUrl) {
       res.status(400).json({ error: 'Title or Repository URL is required' });
       return;
@@ -50,7 +70,12 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
     const readmeContent = await llmService.generateReadme(
       finalAnalysis,
-      provider === 'gemini' ? 'gemini' : 'groq'
+      provider === 'gemini' ? 'gemini' : 'groq',
+      {
+        sections: features, // 'features' from frontend map to the array of section names
+        tone,
+        shields
+      }
     );
 
 
@@ -80,8 +105,8 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
   try {
     const user = (req as any).user;
     if (!process.env.MONGODB_URI) {
-       res.status(503).json({ error: 'Database is not connected' });
-       return;
+      res.status(503).json({ error: 'Database is not connected' });
+      return;
     }
     const projects = await Project.find({ userId: user?._id }).sort({ createdAt: -1 }).limit(10);
     res.status(200).json(projects);

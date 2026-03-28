@@ -6,6 +6,7 @@ import {
   EnvExtractor,
   PackageParser,
   AstFeatureDetector,
+  DefinitionExtractor,
   ProjectAnalysis
 } from '@readme-gen/analyzer';
 import { config } from 'dotenv';
@@ -18,13 +19,23 @@ export class RepoService {
       const { owner, repo } = this.parseRepoUrl(repoUrl);
       const allFilePaths = await this.getFileStructure(owner, repo);
 
-      // 1. Fetch metadata files
-      const metadataFiles = ['package.json', 'go.mod', 'requirements.txt', 'pyproject.toml', '.env.example', '.env', '.gitignore'];
+      // 1. Fetch metadata files (including nested package.json/go.mod for monorepos)
+      const rootMetadata = ['package.json', 'go.mod', 'requirements.txt', 'pyproject.toml', '.env.example', '.env', '.gitignore', 'turbo.json', 'pnpm-workspace.yaml'];
+      const nestedMetadata = allFilePaths.filter(f => 
+        (f.includes('package.json') || f.includes('go.mod')) && 
+        (f.startsWith('apps/') || f.startsWith('packages/'))
+      ).slice(0, 10); // Limit to top 10 nested metadata files
+      
+      const metadataFiles = [...rootMetadata, ...nestedMetadata];
       const fileContents: Record<string, string> = {};
 
       for (const file of metadataFiles) {
         if (allFilePaths.includes(file)) {
-          fileContents[file] = await this.getFileContent(owner, repo, file);
+          try {
+            fileContents[file] = await this.getFileContent(owner, repo, file);
+          } catch (err) {
+            console.warn(`Failed to fetch metadata ${file}:`, err);
+          }
         }
       }
 
@@ -34,8 +45,17 @@ export class RepoService {
       // 3. Package Metadata
       const packageMetadata = await PackageParser.parse(fileContents);
 
-      // 4. Fetch content for important files (limit to 15 for AST/Evidence)
-      const importantFiles = structure.importantFiles.slice(0, 15);
+      // 4. Trace Imports from Entry Points
+      const tracedFiles = new Set<string>();
+      for (const entryPath of structure.entryPoints) {
+        if (allFilePaths.includes(entryPath)) {
+          const content = await this.getFileContent(owner, repo, entryPath);
+          this.traceImports(entryPath, content, allFilePaths).forEach(f => tracedFiles.add(f));
+        }
+      }
+
+      // Merge traced files with important files and limit to a larger set (up to 40)
+      const importantFiles = Array.from(new Set([...structure.entryPoints, ...tracedFiles, ...structure.importantFiles])).slice(0, 40);
       const importantContents: Record<string, string> = { ...fileContents };
 
       for (const filePath of importantFiles) {
@@ -52,12 +72,13 @@ export class RepoService {
       const routes = RouteExtractor.extract(importantContents);
       const envVars = EnvExtractor.extract(importantContents);
       const astFeatures = AstFeatureDetector.detect(importantContents);
+      const definitionsMap = DefinitionExtractor.extract(importantContents);
 
       // 6. Evidence collection
       const evidence = {
         files: importantFiles.map(path => ({
           path,
-          snippets: this.extractSnippets(importantContents[path], path)
+          snippets: definitionsMap[path] || []
         })).filter(f => f.snippets.length > 0)
       };
 
@@ -85,6 +106,8 @@ export class RepoService {
         })),
         envVars,
         hasDocker: structure.hasDocker,
+        tree: structure.tree,
+        keyDirectories: structure.keyDirectories,
         evidence
       };
 
@@ -95,29 +118,29 @@ export class RepoService {
     }
   }
 
+  /**
+   * Simple trace of local file imports to find related logic
+   */
+  private traceImports(filePath: string, content: string, allFiles: string[]): string[] {
+    const dir = filePath.split('/').slice(0, -1).join('/');
+    const importRegex = /from ['"](\.\.?\/[^'"]+)['"]/g;
+    const matches = content.matchAll(importRegex);
+    const results: string[] = [];
 
+    for (const match of matches) {
+      const relPath = match[1];
+      // Try with .ts, .js, .tsx, .jsx extensions
+      const possiblePaths = [
+        `${dir}/${relPath}.ts`, `${dir}/${relPath}.js`,
+        `${dir}/${relPath}/index.ts`, `${dir}/${relPath}/index.js`,
+        `${relPath.replace(/^\./, dir)}.ts`.replace(/^\/\//, '/'), // handle relative paths
+      ];
+      
+      const found = possiblePaths.find(p => allFiles.includes(p.replace(/^\.\//, '')));
+      if (found) results.push(found.replace(/^\.\//, ''));
+    }
 
-  private extractSnippets(content: string, filePath: string): string[] {
-    if (!content) return [];
-    // Just a simple snippet extractor for now, targeting exports or starts of files
-    const lines = content.split('\n');
-    const snippets: string[] = [];
-
-    // Grab first 5 lines
-    if (lines.length > 0) snippets.push(lines.slice(0, 5).join('\n'));
-
-    // Grab any line with "export" or route definition
-    const interestingLines = lines.filter(l =>
-      l.includes('export ') ||
-      l.includes('async function') ||
-      l.includes('class ') ||
-      l.includes('.get(') ||
-      l.includes('.post(')
-    ).slice(0, 3);
-
-    snippets.push(...interestingLines);
-
-    return Array.from(new Set(snippets));
+    return results;
   }
 
   private detectLanguage(files: string[]): string {
@@ -146,7 +169,6 @@ export class RepoService {
         },
       }
     );
-    console.log(response.data)
     return response.data;
   }
 

@@ -43,7 +43,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from '@/contexts/auth-context'
 import { useWorkspace } from '@/contexts/workspace-context'
 import { mockModels } from '@/data/mock'
-import { getSectionSuggestions } from '@/lib/section-suggestions'
 import { consumeDraftRestore } from '@/lib/snapshot-storage'
 import { useReadmeHistory } from '@/hooks/use-readme-history'
 import { cn } from '@/lib/utils'
@@ -145,8 +144,10 @@ export function GeneratePage() {
   const [sections, setSections] = useState<Record<string, boolean>>(
     Object.fromEntries(sectionOptions.map((s) => [s, true])) as Record<string, boolean>,
   )
-  const [tone, setTone] = useState('technical')
-  const [badges, setBadges] = useState(true)
+  const [tone, setTone] = useState('professional')
+  const [shields, setShields] = useState<string[]>(['license', 'stars'])
+  const [aiRecommendations, setAiRecommendations] = useState<{ sections: string[], tone: string, reason: string } | null>(null)
+  const [isRecommending, setIsRecommending] = useState(false)
   
   const [markdown, setMarkdown] = useState(defaultMd)
   const [sectionOrder, setSectionOrder] = useState(() => parseSectionOrder(defaultMd))
@@ -283,9 +284,6 @@ export function GeneratePage() {
   }
 
   // Smart suggestions logic
-  const suggestions = useMemo(() => {
-    return getSectionSuggestions(projectName, description)
-  }, [projectName, description])
 
   const onDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -329,10 +327,13 @@ export function GeneratePage() {
 
           const data = await res.json()
           if (!res.ok) throw new Error(data.error || 'Failed to analyze repository')
-
+            console.log(data)
           setAnalysis(data)
           setProjectName(data.name)
           if (data.description) setDescription(data.description)
+          
+          // Fetch AI recommendations after analysis
+          fetchRecommendations(data)
           
           toast.success(`Analysis complete for ${data.name}`)
           return 'Metadata loaded successfully'
@@ -346,6 +347,46 @@ export function GeneratePage() {
         error: (err) => err.message || 'Could not fetch',
       }
     )
+  }
+
+  async function fetchRecommendations(analysisData: any) {
+    setIsRecommending(true)
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+    
+    try {
+      const res = await fetch(`${API_URL}/recommendations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ 
+          analysis: analysisData,
+          provider: modelId.includes('gemini') ? 'gemini' : 'groq' 
+        }),
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setAiRecommendations(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch recommendations:', err)
+    } finally {
+      setIsRecommending(false)
+    }
+  }
+
+  function applyRecommendations() {
+    if (!aiRecommendations) return
+    
+    setTone(aiRecommendations.tone)
+    const newSections = { ...sections }
+    aiRecommendations.sections.forEach(s => {
+      newSections[s] = true
+    })
+    setSections(newSections)
+    toast.success('AI recommendations applied!')
   }
 
   function onUploadJson(e: React.ChangeEvent<HTMLInputElement>) {
@@ -365,12 +406,6 @@ export function GeneratePage() {
     reader.readAsText(file)
   }
 
-  function addCustomSection(heading: string) {
-    if (!sections[heading]) {
-      setSections(prev => ({ ...prev, [heading]: true }))
-      toast.success(`Added ${heading} section`)
-    }
-  }
 
   async function runGenerate() {
     if (isGenerating) return
@@ -394,7 +429,9 @@ export function GeneratePage() {
               features: enabledStr,
               provider: modelId.includes('gemini') ? 'gemini' : 'groq',
               repoUrl: repoUrl || undefined,
-              analysis: analysis || undefined
+              analysis: analysis || undefined,
+              tone: tone,
+              shields: shields
             }),
           })
 
@@ -573,64 +610,89 @@ export function GeneratePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">README structure</CardTitle>
-                <CardDescription>Toggle sections, tone, and shields.</CardDescription>
+                <CardDescription>AI-driven sections, tone, and shields selection.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-2">
-                  {Object.keys(sections).map((s) => (
-                    <label key={s} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={sections[s]}
-                        onCheckedChange={(c) => setSections((prev) => ({ ...prev, [s]: Boolean(c) }))}
-                      />
-                      {s}
-                    </label>
-                  ))}
-                </div>
+              <CardContent className="space-y-6">
                 
-                {suggestions.length > 0 && (
-                  <div className="bg-muted/30 p-3 rounded-lg border border-border/50">
-                    <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-2">
-                      <Sparkles className="size-3 text-primary" />
-                      Suggested for {projectName || 'this project'}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {suggestions.map((s) => (
-                        <button
-                          key={s.heading}
-                          disabled={sections[s.heading]}
-                          className={cn(
-                            "text-xs px-2.5 py-1 rounded-md border text-left transition-colors",
-                            sections[s.heading] ? "opacity-50 cursor-not-allowed bg-muted" : "bg-background hover:bg-accent hover:border-accent-foreground/20"
-                          )}
-                          onClick={() => addCustomSection(s.heading)}
-                        >
-                          {sections[s.heading] && <Check className="size-3 inline mr-1" />}
-                          {s.label}
-                        </button>
-                      ))}
+                {/* AI Recommendation Card */}
+                {aiRecommendations && (
+                  <div className="bg-primary/5 rounded-xl border border-primary/20 p-4 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <Sparkles className="size-12 text-primary" />
+                    </div>
+                    <div className="relative z-10">
+                      <h4 className="text-xs font-semibold text-primary uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <Sparkles className="size-3" />
+                        AI Recommendation
+                      </h4>
+                      <p className="text-sm font-medium mb-1">Target Tone: <span className="capitalize text-primary">{aiRecommendations.tone}</span></p>
+                      <p className="text-xs text-muted-foreground mb-4 line-clamp-2 italic">"{aiRecommendations.reason}"</p>
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        className="h-8 text-xs bg-primary hover:bg-primary/90"
+                        onClick={applyRecommendations}
+                      >
+                        Apply AI Config
+                      </Button>
                     </div>
                   </div>
                 )}
+
+                {isRecommending && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse py-2">
+                    <Sparkles className="size-3 animate-spin" />
+                    AI is preparing structure recommendations...
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sections</Label>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {Object.keys(sections).map((s) => (
+                      <label key={s} className="flex items-center gap-2 text-sm cursor-pointer hover:text-primary transition-colors">
+                        <Checkbox
+                          checked={sections[s]}
+                          onCheckedChange={(c) => setSections((prev) => ({ ...prev, [s]: Boolean(c) }))}
+                        />
+                        {s}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 
-                <div className="grid gap-2">
-                  <Label>Tone</Label>
+                <div className="grid gap-3 pt-2">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tone & Style</Label>
                   <Select value={tone} onValueChange={(v) => v && setTone(v)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="technical">Technical</SelectItem>
-                      <SelectItem value="friendly">Friendly</SelectItem>
-                      <SelectItem value="minimal">Minimal</SelectItem>
-                      <SelectItem value="enterprise">Enterprise</SelectItem>
+                      <SelectItem value="professional">🎓 Professional (Standard)</SelectItem>
+                      <SelectItem value="friendly">👋 Friendly (Conversational)</SelectItem>
+                      <SelectItem value="minimal">🌑 Minimal (Clean & Simple)</SelectItem>
+                      <SelectItem value="enterprise">🏢 Enterprise (Detailed & Formal)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={badges} onCheckedChange={(c) => setBadges(Boolean(c))} />
-                  Include default badges
-                </label>
+
+                <div className="space-y-3 pt-2 border-t border-border/40">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shields & Badges</Label>
+                  <div className="flex flex-wrap gap-4">
+                    {['license', 'stars', 'version', 'build'].map((s) => (
+                      <label key={s} className="flex items-center gap-2 text-xs cursor-pointer capitalize">
+                        <Checkbox 
+                          checked={shields.includes(s)} 
+                          onCheckedChange={(c) => {
+                            if (c) setShields([...shields, s])
+                            else setShields(shields.filter(i => i !== s))
+                          }} 
+                        />
+                        {s}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

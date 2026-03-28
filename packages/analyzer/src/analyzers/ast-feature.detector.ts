@@ -117,7 +117,12 @@ export class AstFeatureDetector {
         }
       }
 
-      // 5. Direct variable usage for CLI
+      // 5. File-path based API Route Detection (Next.js, etc.)
+      if (filePath.includes('pages/api/') || filePath.includes('app/api/')) {
+        addEvidence('API Endpoints', `File-based route: ${filePath}`, filePath);
+      }
+
+      // 6. Direct variable usage for CLI
       if (content.includes('process.argv')) {
         addEvidence('CLI Tool', 'process.argv', filePath);
       }

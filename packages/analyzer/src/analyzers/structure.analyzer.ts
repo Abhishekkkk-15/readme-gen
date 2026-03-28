@@ -42,7 +42,7 @@ export class StructureAnalyzer {
     return {
       entryPoints,
       keyDirectories: keyDirs,
-      importantFiles: scoredFiles.slice(0, 30).map(f => f.path),
+      importantFiles: scoredFiles.slice(0, 40).map(f => f.path),
       hasDocker,
       tree: this.generateTreeSnippet(filteredFiles, 3)
     };
@@ -51,13 +51,32 @@ export class StructureAnalyzer {
   private static calculateImportance(filePath: string, entryPoints: string[]): number {
     let score = 0;
     const name = filePath.split('/').pop() || '';
+    const lowerPath = filePath.toLowerCase();
 
-    if (entryPoints.includes(filePath)) score += 50;
-    if (filePath.startsWith('src/') || filePath.startsWith('app/') || filePath.startsWith('apps/')) score += 20;
-    if (['package.json', 'go.mod', 'requirements.txt', '.env.example', 'pyproject.toml'].includes(name)) score += 30;
-    if (filePath.includes('test')) score -= 10;
-    if (filePath.includes('utils')) score += 5;
-    if (filePath.toLowerCase().includes('docker')) score += 15;
+    if (entryPoints.includes(filePath)) score += 100; // Entry points are critical
+    
+    // Core architecture folders
+    if (lowerPath.includes('controller')) score += 60;
+    if (lowerPath.includes('route')) score += 60;
+    if (lowerPath.includes('api/')) score += 50; 
+    if (lowerPath.includes('service')) score += 40;
+    
+    // Monorepo specific deep scoring
+    if (lowerPath.includes('apps/') && (lowerPath.includes('/src/') || lowerPath.includes('/app/') || lowerPath.includes('/pages/'))) score += 30;
+    if (lowerPath.includes('packages/') && lowerPath.includes('/src/')) score += 20;
+
+    // File-based Route Detection (Next.js / Nuxt)
+    if (lowerPath.includes('pages/api/') || lowerPath.includes('app/api/')) score += 60;
+
+    // Infrastructure
+    if (['package.json', 'go.mod', 'requirements.txt', '.env.example', 'pyproject.toml', 'turbo.json'].includes(name)) score += 60;
+    if (lowerPath.includes('docker')) score += 20;
+    
+    // Negative weights
+    if (lowerPath.includes('test')) score -= 40;
+    if (lowerPath.includes('spec')) score -= 40;
+    if (lowerPath.includes('mock')) score -= 50;
+    if (lowerPath.includes('util')) score += 5; // Utils are okay but less critical than controllers
 
     return score;
   }

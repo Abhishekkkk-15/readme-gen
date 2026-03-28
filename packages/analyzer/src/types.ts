@@ -27,6 +27,9 @@ export interface ProjectAnalysis {
 
   hasDocker?: boolean;
 
+  tree?: string[];
+  keyDirectories?: string[];
+
   astFeatures: {
     name: string;
     evidence: {

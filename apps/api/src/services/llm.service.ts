@@ -67,9 +67,56 @@ IMPROVED OUTPUT:
     return await chain.invoke({ text });
   }
 
-  public async generateReadme(
+  public async getRecommendations(
     analysis: any,
     provider: 'groq' | 'gemini' = 'groq'
+  ): Promise<{ sections: string[]; tone: string; reason: string }> {
+    let model: any;
+    if (provider === 'gemini' && this.geminiModel) {
+      model = this.geminiModel;
+    } else if (this.groqModel) {
+      model = this.groqModel;
+    } else {
+      throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
+    }
+
+    const recommendationPrompt = `You are a Senior Developer Advocate. Based on the provided project analysis, suggest the ideal README structure and tone.
+    
+## PROJECT ANALYSIS
+Directories: ${analysis.keyDirectories?.join(', ') || 'Not specified'}
+Framework: ${analysis.framework?.name || 'Unknown'}
+Languages: ${analysis.language}
+Features: ${analysis.features?.join(', ')}
+
+## TASK
+1. Recommend which of these standard sections should be included: ["Installation", "Usage", "API Reference", "Deployment", "Architecture", "Environment Variables", "Contributing", "License"].
+2. Recommend the best Tone: ["professional", "friendly", "minimal", "enterprise"].
+3. Provide a brief 1-sentence "Reason" for your choice.
+
+Return ONLY a JSON object:
+{
+  "sections": ["Section 1", "Section 2"],
+  "tone": "recommended-tone",
+  "reason": "Why this fits the project"
+}
+
+RECOMMENDATION JSON:
+`;
+    const response = await model.pipe(new StringOutputParser()).invoke(recommendationPrompt);
+    try {
+      // Clean potential markdown blocks
+      const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanJson);
+    } catch (e) {
+      console.error('Failed to parse recommendations:', e);
+      return { sections: ['Installation', 'Usage'], tone: 'professional', reason: 'Basic project documentation' };
+    }
+  }
+
+  public async generateReadme(
+    analysis: any,
+    provider: 'groq' | 'gemini' = 'groq',
+    options: { sections?: string[]; tone?: string; shields?: string[] } = {}
   ): Promise<string> {
     
     let model: any;
@@ -81,78 +128,111 @@ IMPROVED OUTPUT:
       throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
     }
 
-    // Model is set to 0.1 in constructor
+    const targetTone = options.tone || 'professional';
+    const targetSections = options.sections || ['Installation', 'Usage', 'Features'];
 
-    // Step 1: Fact Normalization
-    const factNormalizationPrompt = `Extract ONLY verifiable facts from the provided analysis JSON.
+    // Step 1: Narrative & Mission Synthesis
+    const narrativePrompt = `You are a Senior Product Manager. Based on the provided project analysis, determine the project's core mission, target audience, and primary value proposition.
+    
+## PROJECT ASSETS
+Key Directories: ${analysis.keyDirectories?.join(', ') || 'Not specified'}
+File Tree: ${analysis.tree?.join('\n') || 'Not specified'}
+Tech Stack: ${analysis.dependencies?.join(', ')}
+
+## TASK
+Synthesize a 1-paragraph "Mission Statement" for this project. 
+Maintain a ${targetTone} tone.
+Explain WHY this project exists based on the code evidence.
+
+ANALYSIS JSON:
+${JSON.stringify(analysis, null, 2)}
+
+MISSION STATEMENT:
+`;
+    const mission = await model.pipe(new StringOutputParser()).invoke(narrativePrompt);
+
+    // Step 2: Fact Normalization
+    const factNormalizationPrompt = `You are an expert architect. Extract ONLY verifiable facts from the provided analysis.
+
+## GUIDELINES
+- Extract ONLY verifiable facts.
+- ONLY include facts relevant to these sections: ${targetSections.join(', ')}.
+- DO NOT infer anything.
+
 Return JSON with this structure:
 {
   "techStack": [],
   "features": [],
   "commands": [],
   "endpoints": [],
-  "envVars": []
+  "envVars": [],
+  "architectureSummary": "Detailed explanation of the project structure based on the tree."
 }
-RULES:
-- DO NOT infer anything.
-- Only include items with direct evidence in the JSON.
-- Features MUST come from the "astFeatures" or "features" list with snippets.
 
 ANALYSIS JSON:
 ${JSON.stringify(analysis, null, 2)}
 `;
     const facts = await model.pipe(new StringOutputParser()).invoke(factNormalizationPrompt);
 
-    // Step 2: README Plan
-    const readmePlanPrompt = `Using ONLY the extracted facts, create a README structure plan.
-Return JSON with this structure:
-{
-  "sections": [
-    { "title": "Section Title", "content": ["Fact 1", "Fact 2"] }
-  ]
-}
-RULES:
-- Only include sections with actual data.
-- Mark missing sections as "Not specified".
-- DO NOT create sections without factual backing.
+    // Step 3: Pro-Writer Generation
+    const generationPrompt = `You are a Senior Technical Writer. Generate a high-quality, professional README.md for this project.
 
-FACTS:
-${facts}
-`;
-    const plan = await model.pipe(new StringOutputParser()).invoke(readmePlanPrompt);
+## INPUTS
+Project Mission: ${mission}
+Technical Facts: ${facts}
+Requested Sections: ${targetSections.join(', ')}
+Target Tone: ${targetTone}
 
-    // Step 3: Generation
-    const generationPrompt = `Generate a README.md using ONLY the structured plan.
-RULES:
-- DO NOT add new information.
-- DO NOT expand features.
-- Keep it concise and factual.
-- Follow the section structure exactly.
+## RULES
+- Write a professional, narrative-driven README.
+- Use a ${targetTone} tone throughout.
+- Include ONLY the following sections in the final output: Title, Description, ${targetSections.join(', ')}.
+- Connect the technology to the mission naturally.
+- Keep it clean, GitHub-flavored markdown.
 
-PLAN:
-${plan}
+README.md:
 `;
     const draft = await model.pipe(new StringOutputParser()).invoke(generationPrompt);
 
-    // Step 4: Audit (Strict)
-    const auditPrompt = `Audit and clean the following README.md.
-REMOVE:
-- Assumptions or inferred information.
-- Generic marketing words (robust, scalable, powerful, enterprise-grade, etc.).
-- Information not present in the original facts JSON.
+    // Step 4: Smart Audit
+    const auditPrompt = `You are a Technical Editor. Review the following README.md for technical accuracy and tone consistency.
 
-REPLACE uncertain parts with: "Not specified"
+## TONE & FACTS
+Target Tone: ${targetTone}
+Facts: ${facts}
 
-ORIGINAL FACTS:
-${facts}
+## TASK
+1. REMOVE any technical claim that is NOT supported by the facts.
+2. Ensure the tone is strictly ${targetTone}.
+3. Preserve the narrative and descriptive language.
+4. If "Shields/Badges" are missing and appropriate, generate placeholders.
 
-GENERATED README:
+ORIGINAL README:
 ${draft}
 
-CLEANED README.md:
+FINAL CLEANED README.md:
 `;
-    return await model.pipe(new StringOutputParser()).invoke(auditPrompt);
+    const cleanedMarkdown = await model.pipe(new StringOutputParser()).invoke(auditPrompt);
+
+    // Final Step: Prepend Shields
+    if (options.shields && options.shields.length > 0) {
+      const shieldsMarkdown = options.shields.map(s => {
+        const repo = analysis.name?.replace(/\s+/g, '-');
+        switch (s) {
+          case 'license': return `![License](https://img.shields.io/github/license/user/${repo}?style=flat-square)`;
+          case 'stars': return `![Stars](https://img.shields.io/github/stars/user/${repo}?style=flat-square)`;
+          case 'version': return `![Version](https://img.shields.io/github/v/release/user/${repo}?style=flat-square)`;
+          case 'build': return `![Build](https://img.shields.io/github/actions/workflow/status/user/${repo}/ci.yml?style=flat-square)`;
+          default: return '';
+        }
+      }).filter(Boolean).join(' ');
+      
+      return `${shieldsMarkdown}\n\n${cleanedMarkdown}`;
+    }
+
+    return cleanedMarkdown;
   }
 }
 
 export const llmService = new LLMService();
+
