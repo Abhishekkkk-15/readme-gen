@@ -9,7 +9,8 @@
     "dev": "tsc -w"
   },
   "dependencies": {
-    "ignore": "^7.0.5"
+    "ignore": "^7.0.5",
+    "ts-morph": "^27.0.2"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",

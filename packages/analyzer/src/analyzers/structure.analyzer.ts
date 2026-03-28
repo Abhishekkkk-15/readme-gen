@@ -3,8 +3,6 @@ import ignore from 'ignore';
 export interface FileEntry {
   path: string;
   name: string;
-  depth: number;
-  importance: number;
 }
 
 export class StructureAnalyzer {
@@ -14,10 +12,11 @@ export class StructureAnalyzer {
     entryPoints: string[];
     keyDirectories: string[];
     importantFiles: string[];
+    hasDocker: boolean;
     tree: string[];
   }> {
     const ig = ignore().add(gitignoreContent || '');
-    ig.add(['node_modules', '.git', '.turbo', 'dist', 'build', '.next']);
+    ig.add(['node_modules', '.git', '.turbo', 'dist', 'build', '.next', '.vscode']);
 
     const filteredFiles = files.filter(f => !ig.ignores(f));
     const entryPoints = filteredFiles.filter(f => this.ENTRY_POINTS.includes(f.split('/').pop() || ''));
@@ -30,7 +29,9 @@ export class StructureAnalyzer {
         directories.add(parts[0]);
       }
     });
-    const keyDirs = Array.from(directories).filter(d => ['src', 'lib', 'app', 'tests', 'docs', 'config'].includes(d));
+    const keyDirs = Array.from(directories).filter(d => ['src', 'lib', 'app', 'tests', 'docs', 'config', 'packages', 'apps'].includes(d));
+
+    const hasDocker = filteredFiles.some(f => f.toLowerCase().includes('dockerfile') || f.toLowerCase().includes('docker-compose'));
 
     // Scored files
     const scoredFiles = filteredFiles.map(f => ({
@@ -41,7 +42,8 @@ export class StructureAnalyzer {
     return {
       entryPoints,
       keyDirectories: keyDirs,
-      importantFiles: scoredFiles.slice(0, 20).map(f => f.path),
+      importantFiles: scoredFiles.slice(0, 30).map(f => f.path),
+      hasDocker,
       tree: this.generateTreeSnippet(filteredFiles, 3)
     };
   }
@@ -51,10 +53,11 @@ export class StructureAnalyzer {
     const name = filePath.split('/').pop() || '';
 
     if (entryPoints.includes(filePath)) score += 50;
-    if (filePath.startsWith('src/') || filePath.startsWith('app/')) score += 20;
-    if (['package.json', 'go.mod', 'requirements.txt', '.env.example'].includes(name)) score += 30;
+    if (filePath.startsWith('src/') || filePath.startsWith('app/') || filePath.startsWith('apps/')) score += 20;
+    if (['package.json', 'go.mod', 'requirements.txt', '.env.example', 'pyproject.toml'].includes(name)) score += 30;
     if (filePath.includes('test')) score -= 10;
     if (filePath.includes('utils')) score += 5;
+    if (filePath.toLowerCase().includes('docker')) score += 15;
 
     return score;
   }
@@ -70,3 +73,4 @@ export class StructureAnalyzer {
     return tree.slice(0, 100);
   }
 }
+

@@ -331,10 +331,10 @@ export function GeneratePage() {
           if (!res.ok) throw new Error(data.error || 'Failed to analyze repository')
 
           setAnalysis(data)
-          setProjectName(data.projectName)
+          setProjectName(data.name)
           if (data.description) setDescription(data.description)
           
-          toast.success(`Analysis complete for ${data.projectName}`)
+          toast.success(`Analysis complete for ${data.name}`)
           return 'Metadata loaded successfully'
         } catch (err: any) {
           throw err

@@ -20,7 +20,7 @@ class LLMService {
       this.groqModel = new ChatGroq({
         apiKey: groqApiKey,
         model: 'llama-3.1-8b-instant',
-        temperature: 0.7,
+        temperature: 0.1,
       });
     }
 
@@ -30,95 +30,13 @@ class LLMService {
         apiKey: geminiApiKey,
         model: 'gemini-1.5-flash',
         maxRetries: 2,
+        temperature: 0.1,
       });
     }
 
     if (!groqApiKey && !geminiApiKey) {
       console.warn('⚠️ No LLM API keys found. Generation will fail.');
     }
-  }
-
-  private buildPrompt(context: any, description: string, features: string[]): string {
-    return `You are generating a README for a real codebase. Use ONLY the information provided below. DO NOT hallucinate commands, files, or features.
-
-## ACTUAL PROJECT DATA
-
-**Project:** ${context.projectOverview.name}
-**Type:** ${context.projectOverview.type}
-**Language:** ${context.projectOverview.language}
-**Framework:** ${context.projectOverview.framework}
-
-**Entry Points:**
-${context.structure.entryPoints.map((f: string) => `- ${f}`).join('\n')}
-
-**Available Commands (from package.json):**
-${Object.entries(context.scripts.actualCommands).map(([cmd, value]) => `- \`${cmd}\`: ${value}`).join('\n')}
-
-**API Endpoints (actual routes in code):**
-${context.api.endpoints.map((e: any) => `- ${e.method} ${e.path}`).join('\n') || 'No API endpoints detected'}
-
-**Environment Variables Required:**
-${context.configuration.envVars.filter((v: any) => v.required).map((v: any) => `- ${v.name}`).join('\n') || 'None detected'}
-
-**Key Dependencies:**
-${context.techStack.core.slice(0, 10).join(', ')}
-
-**Important Files:**
-${context.structure.importantFiles.slice(0, 15).map((f: string) => `- ${f}`).join('\n')}
-
-## INSTRUCTIONS
-Generate a README.md with:
-1. Accurate commands from the actual scripts above
-2. Real file paths from the structure
-3. Environment variables that actually exist
-4. Features inferred from dependencies and structure
-5. Installation steps using the detected package manager (${context.projectOverview.packageManager})
-6. Usage examples based on entry points and API endpoints
-
-Only include sections that have real data. If something doesn't exist, omit it.
-`;
-  }
-
-  public async generateReadme(
-    projectName: string, 
-    description: string, 
-    features: string[],
-    provider: 'groq' | 'gemini' = 'groq',
-    context?: any
-  ): Promise<string> {
-    
-    let model;
-    if (provider === 'gemini' && this.geminiModel) {
-      model = this.geminiModel;
-    } else if (this.groqModel) {
-      model = this.groqModel;
-    } else {
-      throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
-    }
-
-    if (!context) {
-      const basicTemplate = `You are generating a README for a project.
-Project Name: {projectName}
-Description: {description}
-Features: {features}
-
-Markdown Output:
-`;
-      const basicPrompt = PromptTemplate.fromTemplate(basicTemplate);
-      const basicChain = basicPrompt.pipe(model).pipe(new StringOutputParser());
-      return await basicChain.invoke({ projectName, description, features: features.join(', ') });
-    }
-
-    const fullPromptText = this.buildPrompt(context, description, features);
-    
-    // We can use a simple prompt since we already built the full text with template literals
-    const prompt = PromptTemplate.fromTemplate("{fullText}");
-    const parser = new StringOutputParser();
-    const chain = prompt.pipe(model).pipe(parser);
-
-    return await chain.invoke({
-      fullText: fullPromptText,
-    });
   }
 
   public async improveContent(
@@ -147,6 +65,93 @@ IMPROVED OUTPUT:
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
     
     return await chain.invoke({ text });
+  }
+
+  public async generateReadme(
+    analysis: any,
+    provider: 'groq' | 'gemini' = 'groq'
+  ): Promise<string> {
+    
+    let model: any;
+    if (provider === 'gemini' && this.geminiModel) {
+      model = this.geminiModel;
+    } else if (this.groqModel) {
+      model = this.groqModel;
+    } else {
+      throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
+    }
+
+    // Model is set to 0.1 in constructor
+
+    // Step 1: Fact Normalization
+    const factNormalizationPrompt = `Extract ONLY verifiable facts from the provided analysis JSON.
+Return JSON with this structure:
+{
+  "techStack": [],
+  "features": [],
+  "commands": [],
+  "endpoints": [],
+  "envVars": []
+}
+RULES:
+- DO NOT infer anything.
+- Only include items with direct evidence in the JSON.
+- Features MUST come from the "astFeatures" or "features" list with snippets.
+
+ANALYSIS JSON:
+${JSON.stringify(analysis, null, 2)}
+`;
+    const facts = await model.pipe(new StringOutputParser()).invoke(factNormalizationPrompt);
+
+    // Step 2: README Plan
+    const readmePlanPrompt = `Using ONLY the extracted facts, create a README structure plan.
+Return JSON with this structure:
+{
+  "sections": [
+    { "title": "Section Title", "content": ["Fact 1", "Fact 2"] }
+  ]
+}
+RULES:
+- Only include sections with actual data.
+- Mark missing sections as "Not specified".
+- DO NOT create sections without factual backing.
+
+FACTS:
+${facts}
+`;
+    const plan = await model.pipe(new StringOutputParser()).invoke(readmePlanPrompt);
+
+    // Step 3: Generation
+    const generationPrompt = `Generate a README.md using ONLY the structured plan.
+RULES:
+- DO NOT add new information.
+- DO NOT expand features.
+- Keep it concise and factual.
+- Follow the section structure exactly.
+
+PLAN:
+${plan}
+`;
+    const draft = await model.pipe(new StringOutputParser()).invoke(generationPrompt);
+
+    // Step 4: Audit (Strict)
+    const auditPrompt = `Audit and clean the following README.md.
+REMOVE:
+- Assumptions or inferred information.
+- Generic marketing words (robust, scalable, powerful, enterprise-grade, etc.).
+- Information not present in the original facts JSON.
+
+REPLACE uncertain parts with: "Not specified"
+
+ORIGINAL FACTS:
+${facts}
+
+GENERATED README:
+${draft}
+
+CLEANED README.md:
+`;
+    return await model.pipe(new StringOutputParser()).invoke(auditPrompt);
   }
 }
 

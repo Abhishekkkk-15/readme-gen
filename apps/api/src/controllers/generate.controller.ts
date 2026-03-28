@@ -32,41 +32,35 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    let finalMetadata = analysis;
-    let finalTitle = title;
-    let finalDescription = description;
+    let finalAnalysis = analysis;
 
     // If repoUrl is provided but no analysis, perform analysis on the fly
-    if (repoUrl && !finalMetadata) {
+    if (repoUrl && !finalAnalysis) {
       try {
-        const repoAnalysis = await repoService.analyzeRepo(repoUrl);
-        finalMetadata = {
-          structure: repoAnalysis.structure,
-          functions: repoAnalysis.functions,
-          variables: repoAnalysis.variables,
-        };
-        if (!finalTitle) finalTitle = repoAnalysis.projectName;
-        if (!finalDescription) finalDescription = repoAnalysis.description;
+        finalAnalysis = await repoService.analyzeRepo(repoUrl);
       } catch (err) {
         console.warn('On-the-fly analysis failed, proceeding without it:', err);
       }
     }
 
+    if (!finalAnalysis) {
+      res.status(400).json({ error: 'Analysis data is required for generation' });
+      return;
+    }
+
     const readmeContent = await llmService.generateReadme(
-      finalTitle || 'Project',
-      finalDescription || '',
-      Array.isArray(features) ? features : [],
-      provider === 'gemini' ? 'gemini' : 'groq',
-      finalMetadata
+      finalAnalysis,
+      provider === 'gemini' ? 'gemini' : 'groq'
     );
+
 
     // Save the generation to MongoDB associated with the user
     if (process.env.MONGODB_URI && user) {
       try {
         const newProject = new Project({
           userId: user._id,
-          title: finalTitle || 'Untitled',
-          description: finalDescription || '',
+          title: finalAnalysis.name || 'Untitled',
+          description: finalAnalysis.framework?.name || 'Project',
           readmeContent,
         });
         await newProject.save();
