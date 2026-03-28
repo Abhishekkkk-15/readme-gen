@@ -95,3 +95,23 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
     res.status(500).json({ error: 'Failed to retrieve projects' });
   }
 };
+export const improveSection = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { text, provider } = req.body;
+
+    if (!text || text.trim().length === 0) {
+      res.status(400).json({ error: 'Text to improve is required' });
+      return;
+    }
+
+    const improvedContent = await llmService.improveContent(
+      text,
+      provider === 'gemini' ? 'gemini' : 'groq'
+    );
+
+    res.status(200).json({ content: improvedContent });
+  } catch (error: any) {
+    console.error('Error improving content:', error);
+    res.status(500).json({ error: error.message || 'Failed to improve content' });
+  }
+};

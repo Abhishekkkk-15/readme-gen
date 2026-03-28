@@ -120,6 +120,34 @@ Markdown Output:
       fullText: fullPromptText,
     });
   }
+
+  public async improveContent(
+    text: string,
+    provider: 'groq' | 'gemini' = 'groq'
+  ): Promise<string> {
+    let model;
+    if (provider === 'gemini' && this.geminiModel) {
+      model = this.geminiModel;
+    } else if (this.groqModel) {
+      model = this.groqModel;
+    } else {
+      throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
+    }
+
+    const improvementTemplate = `You are an expert technical writer. Improve the following markdown content by making it more professional, clear, and concise. 
+Maintain the original markdown formatting (bold, links, code blocks).
+Only return the improved content. DO NOT add any explanations or introductory text.
+
+CONTENT TO IMPROVE:
+{text}
+
+IMPROVED OUTPUT:
+`;
+    const prompt = PromptTemplate.fromTemplate(improvementTemplate);
+    const chain = prompt.pipe(model).pipe(new StringOutputParser());
+    
+    return await chain.invoke({ text });
+  }
 }
 
 export const llmService = new LLMService();

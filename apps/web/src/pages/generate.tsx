@@ -241,31 +241,43 @@ export function GeneratePage() {
     }
 
     setIsImproving(true)
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
     
-    // Mock AI delay
     toast.promise(
-      new Promise(resolve => setTimeout(resolve, 1500)),
-      {
-        loading: 'AI is improving your text...',
-        success: () => {
-          const improvedText = text
-            .split('\n')
-            .map((line: string) => line.trim() ? `${line} (improved by AI ✨)` : line)
-            .join('\n')
-            
+      async () => {
+        try {
+          const res = await fetch(`${API_URL}/improve`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              text,
+              provider: modelId.includes('gemini') ? 'gemini' : 'groq',
+            }),
+          })
+
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Failed to improve text')
+
           editor.executeEdits('ai-improve', [{
             range: selection,
-            text: improvedText,
+            text: data.content,
             forceMoveMarkers: true
           }])
           editor.focus()
+          return 'Text improved successfully ✨'
+        } catch (err: any) {
+          throw err
+        } finally {
           setIsImproving(false)
-          return 'Text improved successfully!'
-        },
-        error: () => {
-          setIsImproving(false)
-          return 'Failed to improve text.'
         }
+      },
+      {
+        loading: 'AI is improving your text...',
+        success: (msg) => msg,
+        error: (err) => err.message || 'Failed to improve text',
       }
     )
   }
