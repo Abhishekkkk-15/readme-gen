@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import passport from 'passport';
-import { generateReadme, getProjects } from '../controllers/generate.controller';
+import { generateReadme, getProjects, analyzeRepository } from '../controllers/generate.controller';
 
 const router = Router();
+
+// Endpoint for analyzing a GitHub repository (requires authentication)
+router.post('/analyze', passport.authenticate('jwt', { session: false }), analyzeRepository);
 
 // Endpoint for generating a README (requires authentication)
 router.post('/generate', passport.authenticate('jwt', { session: false }), generateReadme);

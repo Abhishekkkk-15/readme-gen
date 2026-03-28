@@ -293,22 +293,47 @@ export function GeneratePage() {
     return <Navigate to="/auth" replace />
   }
 
-  function fetchGithub() {
+  const [analysis, setAnalysis] = useState<any>(null)
+
+  async function fetchGithub() {
     if (!repoUrl.trim()) {
       toast.error('Enter a repository URL')
       return
     }
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
     toast.promise(
-      new Promise((r) => setTimeout(r, 900)),
-      {
-        loading: 'Fetching repository…',
-        success: 'Metadata loaded (mock) — README stub merged',
-        error: 'Could not fetch',
+      async () => {
+        try {
+          const res = await fetch(`${API_URL}/analyze`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ repoUrl }),
+          })
+
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Failed to analyze repository')
+
+          setAnalysis(data)
+          setProjectName(data.projectName)
+          if (data.description) setDescription(data.description)
+          
+          toast.success(`Analysis complete for ${data.projectName}`)
+          return 'Metadata loaded successfully'
+        } catch (err: any) {
+          throw err
+        }
       },
+      {
+        loading: 'Fetching and analyzing repository...',
+        success: (msg) => msg,
+        error: (err) => err.message || 'Could not fetch',
+      }
     )
-    const slug = repoUrl.split('/').filter(Boolean).slice(-2).join('/') || 'demo/repo'
-    setProjectName(slug)
-    setDescription(`Auto-imported from ${repoUrl}`)
   }
 
   function onUploadJson(e: React.ChangeEvent<HTMLInputElement>) {
@@ -356,6 +381,8 @@ export function GeneratePage() {
               description: description || '',
               features: enabledStr,
               provider: modelId.includes('gemini') ? 'gemini' : 'groq',
+              repoUrl: repoUrl || undefined,
+              analysis: analysis || undefined
             }),
           })
 

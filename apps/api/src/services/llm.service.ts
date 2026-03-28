@@ -41,7 +41,12 @@ class LLMService {
     projectName: string, 
     description: string, 
     features: string[],
-    provider: 'groq' | 'gemini' = 'groq'
+    provider: 'groq' | 'gemini' = 'groq',
+    metadata?: {
+      structure: string[];
+      functions: string[];
+      variables: string[];
+    }
   ): Promise<string> {
     
     let model;
@@ -61,6 +66,11 @@ Project Name: {projectName}
 Description: {description}
 Key Features: {features}
 
+Ground Truth Context (Use this for accuracy):
+- File Structure: {structure}
+- Key Functions/Classes: {functions}
+- Key Variables/Constants: {variables}
+
 Markdown Output:
 `;
 
@@ -73,6 +83,9 @@ Markdown Output:
       projectName,
       description,
       features: features.length > 0 ? features.join(', ') : 'None specified',
+      structure: metadata?.structure?.join('\n') || 'Not provided',
+      functions: metadata?.functions?.join('\n') || 'Not provided',
+      variables: metadata?.variables?.join('\n') || 'Not provided',
     });
   }
 }

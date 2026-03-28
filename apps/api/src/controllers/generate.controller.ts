@@ -1,23 +1,63 @@
 import { Request, Response } from 'express';
 import { llmService } from '../services/llm.service';
 import Project from '../models/Project';
+import { repoService } from '../services/repo.service';
 import { config } from 'dotenv';
-config();
-export const generateReadme = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { title, description, features, provider } = req.body;
-    const user = (req as any).user;
 
-    if (!title) {
-      res.status(400).json({ error: 'Title is required' });
+config();
+
+export const analyzeRepository = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { repoUrl } = req.body;
+    if (!repoUrl) {
+      res.status(400).json({ error: 'Repository URL is required' });
       return;
     }
 
+    const analysis = await repoService.analyzeRepo(repoUrl);
+    res.status(200).json(analysis);
+  } catch (error: any) {
+    console.error('Error analyzing repository:', error);
+    res.status(500).json({ error: error.message || 'Failed to analyze repository' });
+  }
+};
+
+export const generateReadme = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { title, description, features, provider, repoUrl, analysis } = req.body;
+    const user = (req as any).user;
+    
+    if (!title && !repoUrl) {
+      res.status(400).json({ error: 'Title or Repository URL is required' });
+      return;
+    }
+
+    let finalMetadata = analysis;
+    let finalTitle = title;
+    let finalDescription = description;
+
+    // If repoUrl is provided but no analysis, perform analysis on the fly
+    if (repoUrl && !finalMetadata) {
+      try {
+        const repoAnalysis = await repoService.analyzeRepo(repoUrl);
+        finalMetadata = {
+          structure: repoAnalysis.structure,
+          functions: repoAnalysis.functions,
+          variables: repoAnalysis.variables,
+        };
+        if (!finalTitle) finalTitle = repoAnalysis.projectName;
+        if (!finalDescription) finalDescription = repoAnalysis.description;
+      } catch (err) {
+        console.warn('On-the-fly analysis failed, proceeding without it:', err);
+      }
+    }
+
     const readmeContent = await llmService.generateReadme(
-      title,
-      description || '',
+      finalTitle || 'Project',
+      finalDescription || '',
       Array.isArray(features) ? features : [],
-      provider === 'gemini' ? 'gemini' : 'groq'
+      provider === 'gemini' ? 'gemini' : 'groq',
+      finalMetadata
     );
 
     // Save the generation to MongoDB associated with the user
@@ -25,8 +65,8 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       try {
         const newProject = new Project({
           userId: user._id,
-          title,
-          description: description || '',
+          title: finalTitle || 'Untitled',
+          description: finalDescription || '',
           readmeContent,
         });
         await newProject.save();
