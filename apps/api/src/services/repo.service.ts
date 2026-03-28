@@ -2,8 +2,7 @@ import axios from 'axios';
 import { PackageExtractor } from '../extractors/package.extractor';
 import { ApiExtractor } from '../extractors/api.extractor';
 import { ConfigExtractor } from '../extractors/config.extractor';
-import { StructureAnalyzer } from '../analyzers/structure.analyzer';
-import { DependencyAnalyzer } from '../analyzers/dependency.analyzer';
+import { StructureAnalyzer, DependencyAnalyzer } from '@readme-gen/analyzer';
 import { CodeSampler } from '../samplers/code.sampler';
 import { ContextFormatter } from '../prompt/context.formatter';
 

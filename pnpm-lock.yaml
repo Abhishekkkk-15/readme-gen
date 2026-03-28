@@ -23,6 +23,9 @@ importers:
       '@langchain/groq':
         specifier: ^1.1.5
         version: 1.1.5(@langchain/core@1.1.36(openai@4.104.0(zod@3.25.76)))
+      '@readme-gen/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
       '@types/bcryptjs':
         specifier: ^3.0.0
         version: 3.0.0
@@ -232,6 +235,19 @@ importers:
       vite:
         specifier: ^8.0.1
         version: 8.0.3(@types/node@24.12.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)
+
+  packages/analyzer:
+    dependencies:
+      ignore:
+        specifier: ^7.0.5
+        version: 7.0.5
+    devDependencies:
+      '@types/node':
+        specifier: ^20.12.7
+        version: 20.19.37
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
 
 packages:
 
@@ -4388,7 +4404,7 @@ snapshots:
   '@types/body-parser@1.19.6':
     dependencies:
       '@types/connect': 3.4.38
-      '@types/node': 20.19.37
+      '@types/node': 24.12.0
 
   '@types/connect@3.4.38':
     dependencies:
@@ -4414,7 +4430,7 @@ snapshots:
 
   '@types/express-serve-static-core@4.19.8':
     dependencies:
-      '@types/node': 20.19.37
+      '@types/node': 24.12.0
       '@types/qs': 6.15.0
       '@types/range-parser': 1.2.7
       '@types/send': 1.2.1
@@ -4536,7 +4552,7 @@ snapshots:
   '@types/serve-static@1.15.10':
     dependencies:
       '@types/http-errors': 2.0.5
-      '@types/node': 20.19.37
+      '@types/node': 24.12.0
       '@types/send': 0.17.6
 
   '@types/statuses@2.0.6': {}
