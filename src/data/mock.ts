@@ -1,0 +1,191 @@
+import type { Generation, Model, User } from '@/types'
+
+export const mockUser: User = {
+  id: 'usr_1',
+  email: 'dev@example.com',
+  plan: 'pro',
+  apiKeys: [
+    { provider: 'OpenAI', key: 'sk-••••••••••••4f21', lastUsed: '2026-03-27T10:00:00.000Z' },
+    { provider: 'Anthropic', key: 'sk-ant-••••••••', lastUsed: '2026-03-26T14:22:00.000Z' },
+  ],
+  usage: {
+    generationsUsed: 42,
+    generationsLimit: -1,
+  },
+}
+
+export const mockModels: Model[] = [
+  {
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    provider: 'OpenAI',
+    contextLength: 128000,
+    pricing: { input: 2.5, output: 10 },
+    capabilities: ['Reasoning', 'Code', 'Long context'],
+    isAvailable: true,
+    performanceScore: 96,
+    recommended: true,
+  },
+  {
+    id: 'gpt-4-turbo',
+    name: 'GPT-4 Turbo',
+    provider: 'OpenAI',
+    contextLength: 128000,
+    pricing: { input: 10, output: 30 },
+    capabilities: ['Code', 'Docs'],
+    isAvailable: true,
+    performanceScore: 92,
+  },
+  {
+    id: 'gpt-3.5-turbo',
+    name: 'GPT-3.5 Turbo',
+    provider: 'OpenAI',
+    contextLength: 16385,
+    pricing: { input: 0.5, output: 1.5 },
+    capabilities: ['Fast', 'Economical'],
+    isAvailable: true,
+    performanceScore: 78,
+  },
+  {
+    id: 'claude-3-opus',
+    name: 'Claude 3 Opus',
+    provider: 'Anthropic',
+    contextLength: 200000,
+    pricing: { input: 15, output: 75 },
+    capabilities: ['Reasoning', 'Long context', 'Docs'],
+    isAvailable: true,
+    performanceScore: 97,
+    recommended: true,
+  },
+  {
+    id: 'claude-3-sonnet',
+    name: 'Claude 3 Sonnet',
+    provider: 'Anthropic',
+    contextLength: 200000,
+    pricing: { input: 3, output: 15 },
+    capabilities: ['Balanced', 'Code'],
+    isAvailable: true,
+    performanceScore: 91,
+  },
+  {
+    id: 'claude-3-haiku',
+    name: 'Claude 3 Haiku',
+    provider: 'Anthropic',
+    contextLength: 200000,
+    pricing: { input: 0.25, output: 1.25 },
+    capabilities: ['Fast', 'Economical'],
+    isAvailable: true,
+    performanceScore: 82,
+  },
+  {
+    id: 'gemini-pro',
+    name: 'Gemini 2.0 Pro',
+    provider: 'Google',
+    contextLength: 1000000,
+    pricing: { input: 1.25, output: 5 },
+    capabilities: ['Multimodal', 'Long context'],
+    isAvailable: true,
+    performanceScore: 90,
+  },
+  {
+    id: 'gemini-ultra',
+    name: 'Gemini Ultra',
+    provider: 'Google',
+    contextLength: 1000000,
+    pricing: { input: 3.5, output: 10.5 },
+    capabilities: ['Advanced reasoning'],
+    isAvailable: true,
+    performanceScore: 94,
+  },
+  {
+    id: 'ollama-llama3',
+    name: 'Llama 3 (Ollama)',
+    provider: 'Local',
+    contextLength: 8192,
+    pricing: { input: 0, output: 0 },
+    capabilities: ['Offline', 'Private'],
+    isAvailable: true,
+    performanceScore: 72,
+  },
+  {
+    id: 'lmstudio-mixtral',
+    name: 'Mixtral 8x7B',
+    provider: 'LM Studio',
+    contextLength: 32768,
+    pricing: { input: 0, output: 0 },
+    capabilities: ['Local', 'Open weights'],
+    isAvailable: true,
+    performanceScore: 80,
+  },
+  {
+    id: 'llama-3-70b',
+    name: 'Llama 3 70B',
+    provider: 'Open Source',
+    contextLength: 8192,
+    pricing: { input: 0.9, output: 0.9 },
+    capabilities: ['Open weights', 'Self-host'],
+    isAvailable: true,
+    performanceScore: 88,
+  },
+  {
+    id: 'mistral-large',
+    name: 'Mistral Large',
+    provider: 'Open Source',
+    contextLength: 128000,
+    pricing: { input: 2, output: 6 },
+    capabilities: ['EU hosting', 'Code'],
+    isAvailable: true,
+    performanceScore: 89,
+  },
+]
+
+export const mockGenerations: Generation[] = [
+  {
+    id: 'gen_1',
+    title: 'readme-gen — AI README platform',
+    content: '# readme-gen\n\nAI-powered README generator...',
+    modelUsed: 'GPT-4o',
+    createdAt: '2026-03-27T09:00:00.000Z',
+    repoUrl: 'https://github.com/acme/readme-gen',
+  },
+  {
+    id: 'gen_2',
+    title: 'design-system',
+    content: '# Design System\n\nComponents and tokens...',
+    modelUsed: 'Claude 3 Sonnet',
+    createdAt: '2026-03-25T16:30:00.000Z',
+    repoUrl: 'https://github.com/acme/design-system',
+  },
+  {
+    id: 'gen_3',
+    title: 'internal-api',
+    content: '# Internal API\n\nREST endpoints...',
+    modelUsed: 'Gemini 2.0 Pro',
+    createdAt: '2026-03-20T11:12:00.000Z',
+  },
+]
+
+export const stats = {
+  githubStars: 12847,
+  cliDownloads: 892_341,
+  testimonials: [
+    {
+      quote:
+        'We ship READMEs for every service in minutes. The GitHub import and section toggles are exactly what our platform team needed.',
+      author: 'Jordan Lee',
+      role: 'Staff Engineer, Northwind',
+    },
+    {
+      quote:
+        'Bring-your-own-key plus hosted models means we can stay compliant and still move fast. Pro tier paid for itself in one sprint.',
+      author: 'Priya Shah',
+      role: 'Head of DevEx, Helio',
+    },
+    {
+      quote:
+        'The CLI fits our CI pipeline; the web UI is where PMs polish tone. Finally one tool for both audiences.',
+      author: 'Marcus Chen',
+      role: 'Director of Engineering, Atlas Labs',
+    },
+  ],
+}
