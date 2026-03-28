@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IProject extends Document {
+  userId: string;
   title: string;
   description: string;
   readmeContent: string;
@@ -10,6 +11,7 @@ export interface IProject extends Document {
 
 const ProjectSchema: Schema = new Schema(
   {
+    userId: { type: Schema.Types.ObjectId, ref: 'User' },
     title: { type: String, required: true },
     description: { type: String, required: false },
     readmeContent: { type: String, required: true },

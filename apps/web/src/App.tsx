@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import { RootLayout } from '@/components/layout/root-layout'
+import { AuthCallbackPage } from '@/pages/auth-callback'
 import { AuthPage } from '@/pages/auth'
 import { DashboardPage } from '@/pages/dashboard'
 import { DocsPage } from '@/pages/docs'
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/models" element={<ModelsPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/templates" element={<TemplatesPage />} />

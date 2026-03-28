@@ -28,7 +28,7 @@ type ApiKeyManagerProps = {
 }
 
 export function ApiKeyManager({ triggerLabel = 'Manage API keys', triggerClassName }: ApiKeyManagerProps) {
-  const { user, setApiKeys } = useAuth()
+  const { user, updateUser } = useAuth()
   const [open, setOpen] = useState(false)
   const [provider, setProvider] = useState(providers[0]!)
   const [keyValue, setKeyValue] = useState('')
@@ -43,22 +43,22 @@ export function ApiKeyManager({ triggerLabel = 'Manage API keys', triggerClassNa
     }
     const masked = `${keyValue.slice(0, 6)}••••${keyValue.slice(-4)}`
     const next: User['apiKeys'] = [
-      ...account.apiKeys,
+      ...(account.apiKeys || []),
       { provider, key: masked, lastUsed: new Date().toISOString() },
     ]
-    setApiKeys(next)
+    updateUser({ apiKeys: next })
     setKeyValue('')
     toast.success(`${provider} key saved (demo — not sent to a server)`)
   }
 
   function removeKey(index: number) {
-    const next = account.apiKeys.filter((_, i) => i !== index)
-    setApiKeys(next)
+    const next = (account.apiKeys || []).filter((_, i) => i !== index)
+    updateUser({ apiKeys: next })
     toast.message('Key removed from this session')
   }
 
   function testKey(index: number) {
-    const k = account.apiKeys[index]
+    const k = (account.apiKeys || [])[index]
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 900)),
       {
@@ -128,10 +128,10 @@ export function ApiKeyManager({ triggerLabel = 'Manage API keys', triggerClassNa
           </p>
           <ScrollArea className="h-48 rounded-lg border">
             <ul className="divide-border divide-y p-2">
-              {account.apiKeys.length === 0 ? (
+              {(account.apiKeys || []).length === 0 ? (
                 <li className="text-muted-foreground p-4 text-center text-sm">No keys yet</li>
               ) : (
-                account.apiKeys.map((k, i) => (
+                (account.apiKeys || []).map((k, i) => (
                   <li key={`${k.provider}-${i}`} className="flex flex-wrap items-center gap-2 py-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{k.provider}</p>

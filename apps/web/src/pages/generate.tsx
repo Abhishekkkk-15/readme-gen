@@ -113,7 +113,8 @@ function reorderMarkdownBySections(md: string, order: { id: string; title: strin
 }
 
 export function GeneratePage() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, token } = useAuth()
+  const [isGenerating, setIsGenerating] = useState(false)
   const { activeWorkspace } = useWorkspace()
   const [params] = useSearchParams()
   const { resolvedTheme } = useTheme()
@@ -144,7 +145,6 @@ export function GeneratePage() {
   const [sections, setSections] = useState<Record<string, boolean>>(
     Object.fromEntries(sectionOptions.map((s) => [s, true])) as Record<string, boolean>,
   )
-  const [customSections, setCustomSections] = useState<Record<string, string>>({})
   const [tone, setTone] = useState('technical')
   const [badges, setBadges] = useState(true)
   
@@ -328,42 +328,56 @@ export function GeneratePage() {
     reader.readAsText(file)
   }
 
-  function addCustomSection(heading: string, bodyContent: string) {
+  function addCustomSection(heading: string) {
     if (!sections[heading]) {
       setSections(prev => ({ ...prev, [heading]: true }))
-      setCustomSections(prev => ({ ...prev, [heading]: bodyContent }))
       toast.success(`Added ${heading} section`)
     }
   }
 
-  function runGenerate() {
-    const name = projectName || 'Your project'
-    const desc = description || 'Generated README outline.'
-    
-    // Core features
-    const enabledStr = Object.keys(sections).filter((s) => sections[s])
-    
-    const body = enabledStr
-      .map((title) => {
-        if (customSections[title]) return customSections[title]!
-        return `## ${title}\n\n_Content for ${title.toLowerCase()} — edit freely._\n`
-      })
-      .join('\n')
-      
-    const badgeLine = badges
-      ? '\n![CI](https://img.shields.io/badge/ci-passing-success) ![License](https://img.shields.io/badge/license-MIT-blue)\n'
-      : ''
-      
-    const next = `# ${name}
+  async function runGenerate() {
+    if (isGenerating) return
+    setIsGenerating(true)
 
-> ${desc}
-${badgeLine}
-${body}
-`
-    setMarkdown(next)
-    setSectionOrder(parseSectionOrder(next))
-    toast.success(`Draft generated — tone: ${tone}`)
-    setStep(3)
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+    const enabledStr = Object.keys(sections).filter((s) => sections[s])
+
+    toast.promise(
+      async () => {
+        try {
+          const res = await fetch(`${API_URL}/generate`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              title: projectName || 'Your project',
+              description: description || '',
+              features: enabledStr,
+              provider: modelId.includes('gemini') ? 'gemini' : 'groq',
+            }),
+          })
+
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Failed to generate README')
+
+          setMarkdown(data.content)
+          setSectionOrder(parseSectionOrder(data.content))
+          setStep(3)
+          return 'README generated successfully!'
+        } catch (err: any) {
+          throw err
+        } finally {
+          setIsGenerating(false)
+        }
+      },
+      {
+        loading: 'Generating your README with AI...',
+        success: (msg) => msg,
+        error: (err) => err.message || 'Failed to generate README',
+      }
+    )
   }
   
   function saveWork() {
@@ -550,7 +564,7 @@ ${body}
                             "text-xs px-2.5 py-1 rounded-md border text-left transition-colors",
                             sections[s.heading] ? "opacity-50 cursor-not-allowed bg-muted" : "bg-background hover:bg-accent hover:border-accent-foreground/20"
                           )}
-                          onClick={() => addCustomSection(s.heading, s.body)}
+                          onClick={() => addCustomSection(s.heading)}
                         >
                           {sections[s.heading] && <Check className="size-3 inline mr-1" />}
                           {s.label}

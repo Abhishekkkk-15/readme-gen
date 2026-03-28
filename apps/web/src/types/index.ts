@@ -1,16 +1,21 @@
 export interface User {
   id: string
   email: string
-  plan: 'free' | 'pro' | 'enterprise'
-  apiKeys: Array<{
+  displayName: string
+  avatarUrl?: string
+  provider: 'local' | 'google' | 'github'
+  plan: 'free' | 'pro'
+  apiKeys: {
     provider: string
     key: string
     lastUsed: string
-  }>
+  }[]
   usage: {
     generationsUsed: number
     generationsLimit: number
   }
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Model {

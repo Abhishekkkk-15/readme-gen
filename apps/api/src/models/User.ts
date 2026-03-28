@@ -8,10 +8,11 @@ export interface IUser extends Document {
   displayName: string;
   avatarUrl?: string;
   plan: 'free' | 'pro';
-  usage: {
-    generationsUsed: number;
-    generationsLimit: number;
-  };
+  apiKeys: {
+    provider: string;
+    key: string;
+    lastUsed: string;
+  }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,6 +26,13 @@ const UserSchema: Schema = new Schema(
     displayName: { type: String, required: true },
     avatarUrl: { type: String, required: false },
     plan: { type: String, enum: ['free', 'pro'], default: 'free' },
+    apiKeys: [
+      {
+        provider: { type: String },
+        key: { type: String },
+        lastUsed: { type: String },
+      },
+    ],
     usage: {
       generationsUsed: { type: Number, default: 0 },
       generationsLimit: { type: Number, default: 5 },

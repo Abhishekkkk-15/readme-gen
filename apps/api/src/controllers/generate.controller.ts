@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import { llmService } from '../services/llm.service';
 import Project from '../models/Project';
-
+import { config } from 'dotenv';
+config();
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title, description, features, provider } = req.body;
+    const user = (req as any).user;
 
     if (!title) {
       res.status(400).json({ error: 'Title is required' });
@@ -18,10 +20,11 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       provider === 'gemini' ? 'gemini' : 'groq'
     );
 
-    // Optionally save the generation to MongoDB
-    if (process.env.MONGODB_URI) {
+    // Save the generation to MongoDB associated with the user
+    if (process.env.MONGODB_URI && user) {
       try {
         const newProject = new Project({
+          userId: user._id,
           title,
           description: description || '',
           readmeContent,
@@ -29,7 +32,6 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
         await newProject.save();
       } catch (dbError) {
         console.error('Failed to save to database:', dbError);
-        // Continue and just return the content to the user
       }
     }
 
@@ -42,11 +44,12 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
 export const getProjects = async (req: Request, res: Response): Promise<void> => {
   try {
+    const user = (req as any).user;
     if (!process.env.MONGODB_URI) {
        res.status(503).json({ error: 'Database is not connected' });
        return;
     }
-    const projects = await Project.find().sort({ createdAt: -1 }).limit(10);
+    const projects = await Project.find({ userId: user?._id }).sort({ createdAt: -1 }).limit(10);
     res.status(200).json(projects);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to retrieve projects' });

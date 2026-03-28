@@ -46,7 +46,7 @@ function passwordStrength(pw: string) {
 }
 
 export function AuthPage() {
-  const { user, isGuest, login, register, logout, enterGuest } = useAuth()
+  const { user, isGuest, login, register, logout, enterGuest, loginWithGoogle, loginWithGithub } = useAuth()
   const navigate = useNavigate()
 
   const loginForm = useForm<LoginValues>({
@@ -61,16 +61,24 @@ export function AuthPage() {
 
   const pw = useWatch({ control: regForm.control, name: 'password' }) ?? ''
 
-  function onLogin(data: LoginValues) {
-    login(data.email, data.password)
-    toast.success('Signed in (demo session)')
-    navigate('/dashboard')
+  async function onLogin(data: LoginValues) {
+    try {
+      await login(data.email, data.password)
+      toast.success('Signed in successfully')
+      navigate('/dashboard')
+    } catch (err: any) {
+      toast.error(err.message || 'Login failed')
+    }
   }
 
-  function onRegister(data: RegisterValues) {
-    register(data.email, data.password)
-    toast.success('Account created (demo)')
-    navigate('/dashboard')
+  async function onRegister(data: RegisterValues) {
+    try {
+      await register(data.email, data.password)
+      toast.success('Account created successfully')
+      navigate('/dashboard')
+    } catch (err: any) {
+      toast.error(err.message || 'Registration failed')
+    }
   }
 
   if (user || isGuest) {
@@ -223,7 +231,7 @@ export function AuthPage() {
                 <button
                   type="button"
                   className={cn(buttonVariants({ variant: 'outline' }), 'w-full gap-2')}
-                  onClick={() => toast.message('GitHub OAuth would open here')}
+                  onClick={loginWithGithub}
                 >
                   <FolderGit className="size-4" />
                   GitHub
@@ -231,7 +239,7 @@ export function AuthPage() {
                 <button
                   type="button"
                   className={cn(buttonVariants({ variant: 'outline' }), 'w-full gap-2')}
-                  onClick={() => toast.message('Google OAuth would open here')}
+                  onClick={loginWithGoogle}
                 >
                   Google
                 </button>

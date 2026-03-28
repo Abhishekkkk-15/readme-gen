@@ -75,19 +75,8 @@ router.get(
 );
 
 // Get current user
-router.get('/me', async (req: any, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
-
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const user = await User.findById(decoded.id).select('-password');
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
+router.get('/me', passport.authenticate('jwt', { session: false }), (req: any, res) => {
+  res.json(req.user);
 });
 
 export default router;

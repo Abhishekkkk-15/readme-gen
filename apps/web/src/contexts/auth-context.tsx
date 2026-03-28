@@ -7,109 +7,142 @@ import {
   type ReactNode,
 } from 'react'
 
-import { mockUser } from '@/data/mock'
 import type { User } from '@/types'
 
-const STORAGE_SESSION = 'readme-gen-session'
-const STORAGE_GUEST = 'readme-gen-guest'
+const STORAGE_TOKEN = 'readme-gen-token'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 type AuthContextValue = {
   user: User | null
+  token: string | null
+  isLoading: boolean
   isGuest: boolean
   isAuthenticated: boolean
-  login: (email: string, _password: string) => void
-  register: (email: string, _password: string) => void
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string, displayName?: string) => Promise<void>
+  loginWithGoogle: () => void
+  loginWithGithub: () => void
   logout: () => void
   enterGuest: () => void
   updateUser: (patch: Partial<User>) => void
-  setApiKeys: (keys: User['apiKeys']) => void
+  setToken: (token: string) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function loadSession(): User | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_SESSION)
-    if (!raw) return null
-    return JSON.parse(raw) as User
-  } catch {
-    return null
-  }
-}
-
-function saveSession(user: User | null) {
-  if (!user) localStorage.removeItem(STORAGE_SESSION)
-  else localStorage.setItem(STORAGE_SESSION, JSON.stringify(user))
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => loadSession())
-  const [isGuest, setIsGuest] = useState(() => localStorage.getItem(STORAGE_GUEST) === '1')
+  const [user, setUser] = useState<User | null>(null)
+  const [token, setTokenState] = useState<string | null>(() => localStorage.getItem(STORAGE_TOKEN))
+  const [isLoading, setIsLoading] = useState(true)
+  const [isGuest, setIsGuest] = useState(() => localStorage.getItem('readme-gen-guest') === '1')
 
-  const login = useCallback((email: string) => {
-    const next: User = {
-      ...mockUser,
-      email,
+  const setToken = useCallback((newToken: string | null) => {
+    setTokenState(newToken)
+    if (newToken) {
+      localStorage.setItem(STORAGE_TOKEN, newToken)
+    } else {
+      localStorage.removeItem(STORAGE_TOKEN)
     }
-    setUser(next)
-    setIsGuest(false)
-    saveSession(next)
-    localStorage.removeItem(STORAGE_GUEST)
   }, [])
 
-  const register = useCallback((email: string) => {
-    const next: User = {
-      ...mockUser,
-      email,
-      plan: 'free',
-      usage: { generationsUsed: 0, generationsLimit: 5 },
+  const fetchUser = useCallback(async (authToken: string) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setUser(data)
+      } else {
+        setToken(null)
+      }
+    } catch {
+      setToken(null)
+    } finally {
+      setIsLoading(false)
     }
-    setUser(next)
+  }, [setToken])
+
+  // Initial check
+  useMemo(() => {
+    if (token) {
+      fetchUser(token)
+    } else {
+      setIsLoading(false)
+    }
+  }, [token, fetchUser])
+
+  const login = useCallback(async (email: string, password: string) => {
+    const res = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Login failed')
+    setToken(data.token)
+    setUser(data.user)
     setIsGuest(false)
-    saveSession(next)
-    localStorage.removeItem(STORAGE_GUEST)
+    localStorage.removeItem('readme-gen-guest')
+  }, [setToken])
+
+  const register = useCallback(async (email: string, password: string, displayName?: string) => {
+    const res = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, displayName }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Registration failed')
+    setToken(data.token)
+    setUser(data.user)
+    setIsGuest(false)
+    localStorage.removeItem('readme-gen-guest')
+  }, [setToken])
+
+  const loginWithGoogle = useCallback(() => {
+    window.location.href = `${API_URL}/auth/google`
+  }, [])
+
+  const loginWithGithub = useCallback(() => {
+    window.location.href = `${API_URL}/auth/github`
   }, [])
 
   const logout = useCallback(() => {
     setUser(null)
+    setToken(null)
     setIsGuest(false)
-    saveSession(null)
-    localStorage.removeItem(STORAGE_GUEST)
-  }, [])
+    localStorage.removeItem('readme-gen-guest')
+  }, [setToken])
 
   const enterGuest = useCallback(() => {
     setUser(null)
+    setToken(null)
     setIsGuest(true)
-    saveSession(null)
-    localStorage.setItem(STORAGE_GUEST, '1')
-  }, [])
+    localStorage.setItem('readme-gen-guest', '1')
+  }, [setToken])
 
   const updateUser = useCallback((patch: Partial<User>) => {
-    setUser((prev) => {
-      if (!prev) return prev
-      const next = { ...prev, ...patch }
-      saveSession(next)
-      return next
-    })
+    setUser((prev) => (prev ? { ...prev, ...patch } : null))
   }, [])
-
-  const setApiKeys = useCallback((keys: User['apiKeys']) => {
-    updateUser({ apiKeys: keys })
-  }, [updateUser])
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      token,
+      isLoading,
       isGuest,
       isAuthenticated: Boolean(user) || isGuest,
       login,
       register,
+      loginWithGoogle,
+      loginWithGithub,
       logout,
       enterGuest,
       updateUser,
-      setApiKeys,
+      setToken,
     }),
-    [user, isGuest, login, register, logout, enterGuest, updateUser, setApiKeys],
+    [user, token, isLoading, isGuest, login, register, loginWithGoogle, loginWithGithub, logout, enterGuest, updateUser, setToken],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -2,7 +2,8 @@ import { ChatGroq } from '@langchain/groq';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
-
+import { config } from 'dotenv';
+config()
 class LLMService {
   private groqModel: ChatGroq | null = null;
   private geminiModel: ChatGoogleGenerativeAI | null = null;
@@ -13,6 +14,7 @@ class LLMService {
 
   private initializeModels() {
     const groqApiKey = process.env.GROQ_API_KEY;
+    console.log(groqApiKey);
     if (groqApiKey) {
       this.groqModel = new ChatGroq({
         apiKey: groqApiKey,

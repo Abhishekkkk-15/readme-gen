@@ -2,6 +2,7 @@ import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as GitHubStrategy } from 'passport-github2';
+import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import bcrypt from 'bcryptjs';
 import User, { IUser } from '../models/User';
 
@@ -25,6 +26,27 @@ export const configurePassport = () => {
         return done(err);
       }
     })
+  );
+
+  // JWT Strategy
+  passport.use(
+    new JwtStrategy(
+      {
+        jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+        secretOrKey: process.env.JWT_SECRET || 'fallback_secret_for_dev_only',
+      },
+      async (payload: any, done: (err: any, user?: any, info?: any) => void) => {
+        try {
+          const user = await User.findById(payload.id);
+          if (user) {
+            return done(null, user);
+          }
+          return done(null, false);
+        } catch (err) {
+          return done(err);
+        }
+      }
+    )
   );
 
   // Google Strategy
