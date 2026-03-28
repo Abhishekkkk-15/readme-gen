@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
 
 const nav = [
+  { to: '/templates', label: 'Templates' },
   { to: '/docs', label: 'Docs' },
   { to: '/models', label: 'Models' },
   { to: '/pricing', label: 'Pricing' },

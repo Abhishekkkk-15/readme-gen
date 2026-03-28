@@ -1,0 +1,37 @@
+# ReadMe Studio — example CI workflow
+# Install the CLI when published, then generate a README on each release tag.
+name: README Studio
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  generate-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # Replace with the published package name when available:
+      # - run: npm install -g @readme-studio/cli
+      # - run: readme-studio generate --repo . --out README.md
+      - name: Placeholder — wire CLI here
+        run: |
+          echo "Add: npm install -g @readme-studio/cli"
+          echo "Then: readme-studio generate --repo . --model gpt-4o"
+
+      # Optional: open a PR instead of committing directly
+      # - uses: peter-evans/create-pull-request@v6
+      #   with:
+      #     title: 'docs: refresh README via ReadMe Studio'
+      #     branch: 'docs/readme-studio-ci'

@@ -36,3 +36,32 @@ export interface Generation {
   createdAt: string
   repoUrl?: string
 }
+
+export interface Workspace {
+  id: string
+  name: string
+  defaultTone: string
+  glossary: string
+  slackWebhookUrl: string
+  discordWebhookUrl: string
+}
+
+export interface ReadmeSnapshot {
+  id: string
+  workspaceId: string
+  name: string
+  content: string
+  createdAt: string
+  sourcesUsed: string[]
+  modelId?: string
+}
+
+export interface ReadmeTemplate {
+  id: string
+  name: string
+  description: string
+  sections: Record<string, boolean>
+  tone: string
+  badges: boolean
+  sampleIntro: string
+}

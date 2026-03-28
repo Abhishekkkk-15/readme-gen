@@ -3,6 +3,7 @@ import { ThemeProvider } from 'next-themes'
 import { type ReactNode, useState } from 'react'
 
 import { AuthProvider } from '@/contexts/auth-context'
+import { WorkspaceProvider } from '@/contexts/workspace-context'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
@@ -23,7 +24,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         <TooltipProvider delay={200}>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <WorkspaceProvider>{children}</WorkspaceProvider>
+          </AuthProvider>
           <Toaster position="top-right" richColors closeButton />
         </TooltipProvider>
       </ThemeProvider>

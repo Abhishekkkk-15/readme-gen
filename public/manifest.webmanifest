@@ -1,0 +1,18 @@
+{
+  "name": "ReadMe Studio",
+  "short_name": "ReadMe",
+  "description": "AI-powered README generator",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#6d28d9",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
