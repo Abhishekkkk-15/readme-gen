@@ -1,40 +1,79 @@
 import axios from 'axios';
+import { PackageExtractor } from '../extractors/package.extractor';
+import { ApiExtractor } from '../extractors/api.extractor';
+import { ConfigExtractor } from '../extractors/config.extractor';
+import { StructureAnalyzer } from '../analyzers/structure.analyzer';
+import { DependencyAnalyzer } from '../analyzers/dependency.analyzer';
+import { CodeSampler } from '../samplers/code.sampler';
+import { ContextFormatter } from '../prompt/context.formatter';
 
-interface RepoMetadata {
-  projectName: string;
-  description: string;
-  structure: string[];
-  functions: string[];
-  variables: string[];
-}
-
-class RepoService {
+export class RepoService {
   private GITHUB_API_URL = 'https://api.github.com/repos';
 
-  /**
-   * Analyzes a GitHub repository and extracts project metadata.
-   * @param repoUrl The full URL of the GitHub repository.
-   */
-  public async analyzeRepo(repoUrl: string): Promise<RepoMetadata> {
+  public async analyzeRepo(repoUrl: string): Promise<any> {
     try {
       const { owner, repo } = this.parseRepoUrl(repoUrl);
-      
-      // 1. Fetch Repository Info (Name and Description)
       const repoInfo = await this.getRepoInfo(owner, repo);
+      const allFilePaths = await this.getFileStructure(owner, repo);
       
-      // 2. Fetch File Structure (Recursive Tree)
-      const structure = await this.getFileStructure(owner, repo);
+      // 1. Fetch contents of key metadata files
+      const metadataFiles = ['package.json', 'go.mod', 'requirements.txt', 'pyproject.toml', '.env.example', '.env', '.gitignore'];
+      const fileContents: Record<string, string> = {};
       
-      // 3. Extract Key Content (Functions, Variables) from important files
-      const { functions, variables } = await this.extractCodeMetadata(owner, repo, structure);
+      for (const file of metadataFiles) {
+        if (allFilePaths.includes(file)) {
+          fileContents[file] = await this.getFileContent(owner, repo, file);
+        }
+      }
 
-      return {
-        projectName: repoInfo.name,
-        description: repoInfo.description || '',
-        structure: structure.slice(0, 100), // Limit to top 100 files for context
-        functions,
-        variables,
+      // 2. Comprehensive Structure Analysis
+      const structure = await StructureAnalyzer.analyze(allFilePaths, fileContents['.gitignore'] || '');
+      
+      // 3. Package Metadata Extraction
+      const packageMetadata = await PackageExtractor.extract(fileContents);
+      
+      // 4. Dependency Analysis
+      const techStack = DependencyAnalyzer.analyze([
+        ...(packageMetadata?.dependencies.production || []),
+        ...(packageMetadata?.dependencies.development || [])
+      ]);
+
+      // 5. Configuration Extraction
+      const configuration = ConfigExtractor.extract(fileContents);
+
+      // 6. API and Code Sampling
+      const endpoints: any[] = [];
+      const codeSamples: any[] = [];
+      
+      // Process important files (limit to top 15 for performance/payload)
+      const filesToAnalyze = structure.importantFiles.slice(0, 15);
+      for (const filePath of filesToAnalyze) {
+        try {
+          const content = await this.getFileContent(owner, repo, filePath);
+          
+          // Extract API endpoints
+          const fileEndpoints = ApiExtractor.extract(content, filePath);
+          endpoints.push(...fileEndpoints);
+
+          // Sample code
+          const sample = CodeSampler.sample(content, filePath);
+          codeSamples.push(sample);
+        } catch (err) {
+          console.warn(`Failed to process ${filePath}:`, err);
+        }
+      }
+
+      // 7. Format for LLM
+      const rawExtractedData = {
+        packageMetadata,
+        structure,
+        techStack,
+        api: { endpoints, totalCount: endpoints.length },
+        configuration,
+        codeSamples
       };
+
+      return ContextFormatter.formatForLLM(rawExtractedData);
     } catch (error: any) {
       console.error('Error analyzing repo:', error);
       throw new Error(`Failed to analyze repository: ${error.message}`);
@@ -55,50 +94,14 @@ class RepoService {
   }
 
   private async getFileStructure(owner: string, repo: string): Promise<string[]> {
-    try {
-      // Get the default branch first
-      const repoData = await this.getRepoInfo(owner, repo);
-      const defaultBranch = repoData.default_branch || 'main';
-      
-      const response = await axios.get(
-        `${this.GITHUB_API_URL}/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`
-      );
-      
-      return response.data.tree
-        .filter((item: any) => item.type === 'blob')
-        .map((item: any) => item.path)
-        .filter((path: string) => !path.includes('node_modules') && !path.startsWith('.git/'));
-    } catch (error) {
-      console.warn('Could not fetch recursive tree, falling back to basic contents');
-      const response = await axios.get(`${this.GITHUB_API_URL}/${owner}/${repo}/contents`);
-      return response.data.map((item: any) => item.path);
-    }
-  }
-
-  private async extractCodeMetadata(owner: string, repo: string, structure: string[]) {
-    const importantFiles = structure.filter(path => 
-      (path.includes('src/') || path.includes('lib/') || path.includes('app/')) &&
-      (path.endsWith('.ts') || path.endsWith('.js') || path.endsWith('.py') || path.endsWith('.go'))
-    ).slice(0, 5); // Limit to top 5 files to avoid hitting rate limits or large payloads
-
-    const functions: string[] = [];
-    const variables: string[] = [];
-
-    for (const filePath of importantFiles) {
-      try {
-        const content = await this.getFileContent(owner, repo, filePath);
-        const { foundFunctions, foundVariables } = this.parseContent(content, filePath);
-        functions.push(...foundFunctions.map(f => `${filePath}: ${f}`));
-        variables.push(...foundVariables.map(v => `${filePath}: ${v}`));
-      } catch (err) {
-        console.error(`Failed to parse ${filePath}:`, err);
-      }
-    }
-
-    return { 
-      functions: functions.slice(0, 20), 
-      variables: variables.slice(0, 20) 
-    };
+    const repoData = await this.getRepoInfo(owner, repo);
+    const defaultBranch = repoData.default_branch || 'main';
+    const response = await axios.get(
+      `${this.GITHUB_API_URL}/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`
+    );
+    return response.data.tree
+      .filter((item: any) => item.type === 'blob')
+      .map((item: any) => item.path);
   }
 
   private async getFileContent(owner: string, repo: string, path: string): Promise<string> {
@@ -107,33 +110,6 @@ class RepoService {
       { headers: { Accept: 'application/vnd.github.v3.raw' } }
     );
     return response.data;
-  }
-
-  private parseContent(content: string, filePath: string) {
-    const foundFunctions: string[] = [];
-    const foundVariables: string[] = [];
-
-    // Simple regex for JS/TS/PY functions
-    if (filePath.endsWith('.ts') || filePath.endsWith('.js')) {
-      const funcRegex = /export\s+(?:async\s+)?(?:function|const)\s+([a-zA-Z0-9_]+)\s*(?:=|\[|\()/g;
-      let match;
-      while ((match = funcRegex.exec(content)) !== null) {
-        if (match[1]) foundFunctions.push(match[1]);
-      }
-      
-      const varRegex = /export\s+(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=/g;
-      while ((match = varRegex.exec(content)) !== null) {
-        if (match[1]) foundVariables.push(match[1]);
-      }
-    } else if (filePath.endsWith('.py')) {
-      const funcRegex = /def\s+([a-zA-Z0-9_]+)\s*\(/g;
-      let match;
-      while ((match = funcRegex.exec(content)) !== null) {
-        if (match[1]) foundFunctions.push(match[1]);
-      }
-    }
-
-    return { foundFunctions, foundVariables };
   }
 }
 

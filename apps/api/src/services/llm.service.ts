@@ -42,11 +42,7 @@ class LLMService {
     description: string, 
     features: string[],
     provider: 'groq' | 'gemini' = 'groq',
-    metadata?: {
-      structure: string[];
-      functions: string[];
-      variables: string[];
-    }
+    context?: any
   ): Promise<string> {
     
     let model;
@@ -58,20 +54,61 @@ class LLMService {
       throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
     }
 
-    const template = `You are an expert developer and technical writer. 
-Generate a professional README.md for the following project.
-Include Introduction, Features, Installation, Usage, and License sections. Don't wrap the output in markdown code blocks if the entire response is the README itself.
-
+    if (!context) {
+      // Fallback to basic generation if no context is provided
+      const basicTemplate = `You are generating a README for a project.
 Project Name: {projectName}
 Description: {description}
-Key Features: {features}
-
-Ground Truth Context (Use this for accuracy):
-- File Structure: {structure}
-- Key Functions/Classes: {functions}
-- Key Variables/Constants: {variables}
+Features: {features}
 
 Markdown Output:
+`;
+      const basicPrompt = PromptTemplate.fromTemplate(basicTemplate);
+      const basicChain = basicPrompt.pipe(model).pipe(new StringOutputParser());
+      return await basicChain.invoke({
+        projectName,
+        description,
+        features: features.join(', ')
+      });
+    }
+
+    const template = `You are generating a README for a real codebase. Use ONLY the information provided below. DO NOT hallucinate commands, files, or features.
+
+## ACTUAL PROJECT DATA
+
+**Project:** {projectName}
+**Type:** {projectType}
+**Language:** {language}
+**Framework:** {framework}
+
+**Entry Points:**
+{entryPoints}
+
+**Available Commands (from package.json):**
+{commands}
+
+**API Endpoints (actual routes in code):**
+{apiEndpoints}
+
+**Environment Variables Required:**
+{envVars}
+
+**Key Dependencies:**
+{techStack}
+
+**Important Files:**
+{importantFiles}
+
+## INSTRUCTIONS
+Generate a README.md with:
+1. Accurate commands from the actual scripts above
+2. Real file paths from the structure
+3. Environment variables that actually exist
+4. Features inferred from dependencies and structure
+5. Installation steps using the detected package manager
+6. Usage examples based on entry points and API endpoints
+
+Only include sections that have real data. If something doesn't exist, omit it.
 `;
 
     const prompt = PromptTemplate.fromTemplate(template);
@@ -80,12 +117,18 @@ Markdown Output:
     const chain = prompt.pipe(model).pipe(parser);
 
     return await chain.invoke({
-      projectName,
-      description,
-      features: features.length > 0 ? features.join(', ') : 'None specified',
-      structure: metadata?.structure?.join('\n') || 'Not provided',
-      functions: metadata?.functions?.join('\n') || 'Not provided',
-      variables: metadata?.variables?.join('\n') || 'Not provided',
+      projectName: context.projectOverview.name,
+      projectType: context.projectOverview.type,
+      language: context.projectOverview.language,
+      framework: context.projectOverview.frameworks?.join(', ') || 'N/A',
+      entryPoints: context.structure.entryPoints.map((f: string) => `- ${f}`).join('\n'),
+      commands: Object.entries(context.scripts.actualCommands).map(([cmd, value]) => `- \`${cmd}\`: ${value}`).join('\n'),
+      apiEndpoints: context.api.endpoints.map((e: any) => `- ${e.method} ${e.path}`).join('\n') || 'No API endpoints detected',
+      envVars: context.configuration.envVars.filter((v: any) => v.required).map((v: any) => `- ${v.name}`).join('\n') || 'None detected',
+      techStack: context.techStack.core.slice(0, 10).join(', '),
+      importantFiles: context.structure.importantFiles.slice(0, 15).map((f: string) => `- ${f}`).join('\n'),
+      description: description,
+      features: features.join(', ')
     });
   }
 }
