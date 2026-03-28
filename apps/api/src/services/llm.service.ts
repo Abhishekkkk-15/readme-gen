@@ -3,7 +3,9 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { config } from 'dotenv';
-config()
+
+config();
+
 class LLMService {
   private groqModel: ChatGroq | null = null;
   private geminiModel: ChatGoogleGenerativeAI | null = null;
@@ -14,7 +16,6 @@ class LLMService {
 
   private initializeModels() {
     const groqApiKey = process.env.GROQ_API_KEY;
-    console.log(groqApiKey);
     if (groqApiKey) {
       this.groqModel = new ChatGroq({
         apiKey: groqApiKey,
@@ -37,6 +38,47 @@ class LLMService {
     }
   }
 
+  private buildPrompt(context: any, description: string, features: string[]): string {
+    return `You are generating a README for a real codebase. Use ONLY the information provided below. DO NOT hallucinate commands, files, or features.
+
+## ACTUAL PROJECT DATA
+
+**Project:** ${context.projectOverview.name}
+**Type:** ${context.projectOverview.type}
+**Language:** ${context.projectOverview.language}
+**Framework:** ${context.projectOverview.framework}
+
+**Entry Points:**
+${context.structure.entryPoints.map((f: string) => `- ${f}`).join('\n')}
+
+**Available Commands (from package.json):**
+${Object.entries(context.scripts.actualCommands).map(([cmd, value]) => `- \`${cmd}\`: ${value}`).join('\n')}
+
+**API Endpoints (actual routes in code):**
+${context.api.endpoints.map((e: any) => `- ${e.method} ${e.path}`).join('\n') || 'No API endpoints detected'}
+
+**Environment Variables Required:**
+${context.configuration.envVars.filter((v: any) => v.required).map((v: any) => `- ${v.name}`).join('\n') || 'None detected'}
+
+**Key Dependencies:**
+${context.techStack.core.slice(0, 10).join(', ')}
+
+**Important Files:**
+${context.structure.importantFiles.slice(0, 15).map((f: string) => `- ${f}`).join('\n')}
+
+## INSTRUCTIONS
+Generate a README.md with:
+1. Accurate commands from the actual scripts above
+2. Real file paths from the structure
+3. Environment variables that actually exist
+4. Features inferred from dependencies and structure
+5. Installation steps using the detected package manager (${context.projectOverview.packageManager})
+6. Usage examples based on entry points and API endpoints
+
+Only include sections that have real data. If something doesn't exist, omit it.
+`;
+  }
+
   public async generateReadme(
     projectName: string, 
     description: string, 
@@ -55,7 +97,6 @@ class LLMService {
     }
 
     if (!context) {
-      // Fallback to basic generation if no context is provided
       const basicTemplate = `You are generating a README for a project.
 Project Name: {projectName}
 Description: {description}
@@ -65,70 +106,18 @@ Markdown Output:
 `;
       const basicPrompt = PromptTemplate.fromTemplate(basicTemplate);
       const basicChain = basicPrompt.pipe(model).pipe(new StringOutputParser());
-      return await basicChain.invoke({
-        projectName,
-        description,
-        features: features.join(', ')
-      });
+      return await basicChain.invoke({ projectName, description, features: features.join(', ') });
     }
 
-    const template = `You are generating a README for a real codebase. Use ONLY the information provided below. DO NOT hallucinate commands, files, or features.
-
-## ACTUAL PROJECT DATA
-
-**Project:** {projectName}
-**Type:** {projectType}
-**Language:** {language}
-**Framework:** {framework}
-
-**Entry Points:**
-{entryPoints}
-
-**Available Commands (from package.json):**
-{commands}
-
-**API Endpoints (actual routes in code):**
-{apiEndpoints}
-
-**Environment Variables Required:**
-{envVars}
-
-**Key Dependencies:**
-{techStack}
-
-**Important Files:**
-{importantFiles}
-
-## INSTRUCTIONS
-Generate a README.md with:
-1. Accurate commands from the actual scripts above
-2. Real file paths from the structure
-3. Environment variables that actually exist
-4. Features inferred from dependencies and structure
-5. Installation steps using the detected package manager
-6. Usage examples based on entry points and API endpoints
-
-Only include sections that have real data. If something doesn't exist, omit it.
-`;
-
-    const prompt = PromptTemplate.fromTemplate(template);
+    const fullPromptText = this.buildPrompt(context, description, features);
+    
+    // We can use a simple prompt since we already built the full text with template literals
+    const prompt = PromptTemplate.fromTemplate("{fullText}");
     const parser = new StringOutputParser();
-
     const chain = prompt.pipe(model).pipe(parser);
 
     return await chain.invoke({
-      projectName: context.projectOverview.name,
-      projectType: context.projectOverview.type,
-      language: context.projectOverview.language,
-      framework: context.projectOverview.frameworks?.join(', ') || 'N/A',
-      entryPoints: context.structure.entryPoints.map((f: string) => `- ${f}`).join('\n'),
-      commands: Object.entries(context.scripts.actualCommands).map(([cmd, value]) => `- \`${cmd}\`: ${value}`).join('\n'),
-      apiEndpoints: context.api.endpoints.map((e: any) => `- ${e.method} ${e.path}`).join('\n') || 'No API endpoints detected',
-      envVars: context.configuration.envVars.filter((v: any) => v.required).map((v: any) => `- ${v.name}`).join('\n') || 'None detected',
-      techStack: context.techStack.core.slice(0, 10).join(', '),
-      importantFiles: context.structure.importantFiles.slice(0, 15).map((f: string) => `- ${f}`).join('\n'),
-      description: description,
-      features: features.join(', ')
+      fullText: fullPromptText,
     });
   }
 }

@@ -16,6 +16,7 @@ export class ContextFormatter {
         name: packageMetadata?.name || 'Unknown Project',
         type: packageMetadata?.frameworks?.[0] || 'Generic',
         language: this.detectLanguage(packageMetadata, structure),
+        framework: packageMetadata?.frameworks?.[0] || 'N/A',
         frameworks: packageMetadata?.frameworks || [],
         packageManager: packageMetadata?.packageManager || 'npm'
       },
