@@ -40,6 +40,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from '@/components/ui/textarea'
+
 import { useAuth } from '@/contexts/auth-context'
 import { useWorkspace } from '@/contexts/workspace-context'
 import { mockModels } from '@/data/mock'
@@ -148,6 +150,7 @@ export function GeneratePage() {
   const [shields, setShields] = useState<string[]>(['license', 'stars'])
   const [aiRecommendations, setAiRecommendations] = useState<{ sections: string[], tone: string, reason: string } | null>(null)
   const [isRecommending, setIsRecommending] = useState(false)
+  const [additionalContext, setAdditionalContext] = useState('')
   
   const [markdown, setMarkdown] = useState(defaultMd)
   const [sectionOrder, setSectionOrder] = useState(() => parseSectionOrder(defaultMd))
@@ -329,8 +332,8 @@ export function GeneratePage() {
           if (!res.ok) throw new Error(data.error || 'Failed to analyze repository')
             console.log(data)
           setAnalysis(data)
-          setProjectName(data.name)
-          if (data.description) setDescription(data.description)
+          setProjectName(data.name || '')
+          setDescription(data.description || '')
           
           // Fetch AI recommendations after analysis
           fetchRecommendations(data)
@@ -431,7 +434,8 @@ export function GeneratePage() {
               repoUrl: repoUrl || undefined,
               analysis: analysis || undefined,
               tone: tone,
-              shields: shields
+              shields: shields,
+              additionalContext: additionalContext
             }),
           })
 
@@ -692,6 +696,17 @@ export function GeneratePage() {
                       </label>
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-3 pt-2 border-t border-border/40">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Custom Instructions / Context</Label>
+                  <Textarea 
+                    placeholder="e.g. This project is in alpha. Mention that Node 20 is required. Explain the specific deployment steps for AWS."
+                    className="text-xs resize-none min-h-[80px]"
+                    value={additionalContext}
+                    onChange={(e) => setAdditionalContext(e.target.value)}
+                  />
+                  <p className="text-[10px] text-muted-foreground italic">AI will prioritize these instructions during generation.</p>
                 </div>
               </CardContent>
             </Card>

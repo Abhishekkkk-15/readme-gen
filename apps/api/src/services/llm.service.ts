@@ -116,7 +116,7 @@ RECOMMENDATION JSON:
   public async generateReadme(
     analysis: any,
     provider: 'groq' | 'gemini' = 'groq',
-    options: { sections?: string[]; tone?: string; shields?: string[] } = {}
+    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string } = {}
   ): Promise<string> {
     
     let model: any;
@@ -130,19 +130,23 @@ RECOMMENDATION JSON:
 
     const targetTone = options.tone || 'professional';
     const targetSections = options.sections || ['Installation', 'Usage', 'Features'];
+    const userContext = options.additionalContext || 'No additional context provided.';
 
     // Step 1: Narrative & Mission Synthesis
-    const narrativePrompt = `You are a Senior Product Manager. Based on the provided project analysis, determine the project's core mission, target audience, and primary value proposition.
+    const narrativePrompt = `You are a Senior Product Manager. Based on the provided project analysis and user context, determine the project's core mission.
     
 ## PROJECT ASSETS
 Key Directories: ${analysis.keyDirectories?.join(', ') || 'Not specified'}
 File Tree: ${analysis.tree?.join('\n') || 'Not specified'}
 Tech Stack: ${analysis.dependencies?.join(', ')}
 
+## USER CUSTOM INSTRUCTIONS (PRIORITY)
+${userContext}
+
 ## TASK
 Synthesize a 1-paragraph "Mission Statement" for this project. 
 Maintain a ${targetTone} tone.
-Explain WHY this project exists based on the code evidence.
+PRIORITIZE user custom instructions over detected facts if there is a conflict.
 
 ANALYSIS JSON:
 ${JSON.stringify(analysis, null, 2)}
@@ -151,13 +155,14 @@ MISSION STATEMENT:
 `;
     const mission = await model.pipe(new StringOutputParser()).invoke(narrativePrompt);
 
-    // Step 2: Fact Normalization
+    // Step 2: Fact Normalization (Strict Filter)
     const factNormalizationPrompt = `You are an expert architect. Extract ONLY verifiable facts from the provided analysis.
 
 ## GUIDELINES
 - Extract ONLY verifiable facts.
-- ONLY include facts relevant to these sections: ${targetSections.join(', ')}.
-- DO NOT infer anything.
+- ONLY include facts relevant to these requested sections: ${targetSections.join(', ')}.
+- IF A SECTION IS NOT IN THE REQUESTED LIST, DO NOT EXTRACT FACTS FOR IT.
+- Include facts from User Context: ${userContext}
 
 Return JSON with this structure:
 {
@@ -166,7 +171,7 @@ Return JSON with this structure:
   "commands": [],
   "endpoints": [],
   "envVars": [],
-  "architectureSummary": "Detailed explanation of the project structure based on the tree."
+  "architectureSummary": "Detailed explanation."
 }
 
 ANALYSIS JSON:
@@ -174,38 +179,37 @@ ${JSON.stringify(analysis, null, 2)}
 `;
     const facts = await model.pipe(new StringOutputParser()).invoke(factNormalizationPrompt);
 
-    // Step 3: Pro-Writer Generation
-    const generationPrompt = `You are a Senior Technical Writer. Generate a high-quality, professional README.md for this project.
+    // Step 3: Pro-Writer Generation (Strict Whitelist)
+    const generationPrompt = `You are a Senior Technical Writer. Generate a professional README.md.
 
 ## INPUTS
 Project Mission: ${mission}
 Technical Facts: ${facts}
-Requested Sections: ${targetSections.join(', ')}
+Requested Sections (WHITELIST): ${targetSections.join(', ')}
 Target Tone: ${targetTone}
+User Custom Instructions: ${userContext}
 
-## RULES
-- Write a professional, narrative-driven README.
-- Use a ${targetTone} tone throughout.
-- Include ONLY the following sections in the final output: Title, Description, ${targetSections.join(', ')}.
-- Connect the technology to the mission naturally.
-- Keep it clean, GitHub-flavored markdown.
+## STRICT RULES
+1. ONLY include the following sections: Title, Description, ${targetSections.join(', ')}.
+2. DO NOT include "API Reference" or "Endpoints" unless explicitly in the whitelist.
+3. DO NOT include "Environment Variables" unless explicitly in the whitelist.
+4. If a section is unrequested, DO NOT even mention it.
+5. Prioritize User Custom Instructions for all content.
 
 README.md:
 `;
     const draft = await model.pipe(new StringOutputParser()).invoke(generationPrompt);
 
     // Step 4: Smart Audit
-    const auditPrompt = `You are a Technical Editor. Review the following README.md for technical accuracy and tone consistency.
+    const auditPrompt = `You are a Technical Editor. Strip any unrequested sections.
 
-## TONE & FACTS
-Target Tone: ${targetTone}
-Facts: ${facts}
+## WHITELISTED SECTIONS
+${targetSections.join(', ')}
 
 ## TASK
-1. REMOVE any technical claim that is NOT supported by the facts.
+1. Remove any section header (## Header) that is NOT in the whitelist.
 2. Ensure the tone is strictly ${targetTone}.
-3. Preserve the narrative and descriptive language.
-4. If "Shields/Badges" are missing and appropriate, generate placeholders.
+3. Fact-check against: ${facts}
 
 ORIGINAL README:
 ${draft}

@@ -44,7 +44,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis, tone, shields } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext } = req.body;
     const user = (req as any).user;
 
     if (!title && !repoUrl) {
@@ -74,7 +74,8 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       {
         sections: features, // 'features' from frontend map to the array of section names
         tone,
-        shields
+        shields,
+        additionalContext
       }
     );
 

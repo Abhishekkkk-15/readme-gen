@@ -84,8 +84,8 @@ export class RepoService {
 
       // 7. Assemble Final Analysis
       const analysis: ProjectAnalysis = {
-        name: packageMetadata?.name || repo,
-        description: packageMetadata?.description || '',
+        name: String(packageMetadata?.name || repo),
+        description: String(packageMetadata?.description || ''),
         language: this.detectLanguage(allFilePaths),
         features: astFeatures.map(f => f.name),
         astFeatures,
