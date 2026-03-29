@@ -78,12 +78,29 @@ export class DefinitionExtractor {
       if (initializer) {
         if (Node.isArrowFunction(initializer) || Node.isFunctionExpression(initializer)) {
           const name = node.getName();
-          const params = this.formatParams((initializer as any).getParameters());
-          const returnType = this.safeGetReturnType(initializer as any);
-          definitions.push(`Function (assigned): ${name}(${params}) -> ${returnType}`);
-        } else if (Node.isObjectLiteralExpression(initializer) && node.getName().match(/config|options|settings/i)) {
-          definitions.push(`Config Object: ${node.getName()} = ${initializer.getText().substring(0, 300)}...`);
+          const params = this.formatSignature(initializer, 'Function (assigned)');
+          definitions.push(params);
+        } else if (Node.isObjectLiteralExpression(initializer)) {
+          // If it's a small object literal with methods, extract them
+          initializer.getProperties().forEach(prop => {
+            if (Node.isMethodDeclaration(prop) || Node.isPropertyAssignment(prop)) {
+              const propInit = Node.isPropertyAssignment(prop) ? prop.getInitializer() : null;
+              if (Node.isMethodDeclaration(prop) || (propInit && (Node.isArrowFunction(propInit) || Node.isFunctionExpression(propInit)))) {
+                const name = Node.isPropertyAssignment(prop) ? prop.getName() : (prop as any).getName();
+                const fn = Node.isPropertyAssignment(prop) ? (propInit as any) : prop;
+                definitions.push(`  Method (obj-prop): ${name}${this.formatParamsSnippet(fn)}`);
+              }
+            }
+          });
         }
+      }
+    }
+
+    // Export Assignments
+    if (Node.isExportAssignment(node)) {
+      const expression = node.getExpression();
+      if (Node.isArrowFunction(expression) || Node.isFunctionExpression(expression)) {
+        definitions.push(`Export Default Function: ${this.formatSignature(expression, '')}`);
       }
     }
 
@@ -94,11 +111,16 @@ export class DefinitionExtractor {
   }
 
   private static formatSignature(node: any, kind: string): string {
-    const name = node.getName?.() || "anonymous";
+    const name = node.getName?.() || "";
+    const params = this.formatParamsSnippet(node);
+    const asyncStr = node.isAsync?.() ? 'async ' : '';
+    return `${asyncStr}${kind}${name ? ': ' + name : ''}${params}`;
+  }
+
+  private static formatParamsSnippet(node: any): string {
     const params = this.formatParams(node.getParameters?.() || []);
     const returnType = this.safeGetReturnType(node);
-    const asyncStr = node.isAsync?.() ? 'async ' : '';
-    return `${asyncStr}${kind}: ${name}(${params}) -> ${returnType}`;
+    return `(${params}) -> ${returnType}`;
   }
 
   private static formatParams(params: ParameterDeclaration[]): string {

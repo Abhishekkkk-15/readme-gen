@@ -68,7 +68,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
     }
 
     let finalAnalysis = analysis;
-
+    console.log(analysis)
     // If repoUrl is provided but no analysis, perform analysis on the fly
     if (repoUrl && !finalAnalysis) {
       try {

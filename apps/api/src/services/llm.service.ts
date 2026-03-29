@@ -91,11 +91,20 @@ RECOMMENDATION JSON:
       if (start === -1 || end === -1) throw new Error('Could not find JSON object in response.');
 
       const cleanJson = response.substring(start, end + 1).trim();
-      return JSON.parse(cleanJson);
+      const sanitized = this.sanitizeJsonString(cleanJson);
+      return JSON.parse(sanitized);
     } catch (e) {
       console.error('Failed to parse recommendations:', e);
       return { sections: ['Installation', 'Usage'], tone: 'professional', reason: 'Basic project documentation' };
     }
+  }
+
+  private sanitizeJsonString(json: string): string {
+    return json
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
+      .replace(/\n/g, "\\n")                         // Escape literal newlines
+      .replace(/\r/g, "\\r")                         // Escape carriage returns
+      .replace(/\t/g, "\\t");                        // Escape tabs
   }
 
   public async generateReadme(
