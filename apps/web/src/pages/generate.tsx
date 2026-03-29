@@ -154,6 +154,9 @@ export function GeneratePage() {
   
   const [markdown, setMarkdown] = useState(defaultMd)
   const [sectionOrder, setSectionOrder] = useState(() => parseSectionOrder(defaultMd))
+  const [generateNested, setGenerateNested] = useState(false)
+  const [generatedFiles, setGeneratedFiles] = useState<{ path: string, content: string }[]>([])
+  const [activeFilePath, setActiveFilePath] = useState<string>('README.md')
   
   const [diffTarget, setDiffTarget] = useState<string | null>(null)
   const [targetLang, setTargetLang] = useState('en')
@@ -435,13 +438,21 @@ export function GeneratePage() {
               analysis: analysis || undefined,
               tone: tone,
               shields: shields,
-              additionalContext: additionalContext
+              additionalContext: additionalContext,
+              generateNested: generateNested
             }),
           })
 
           const data = await res.json()
           if (!res.ok) throw new Error(data.error || 'Failed to generate README')
 
+          if (data.readmes && data.readmes.length > 0) {
+            setGeneratedFiles([{ path: 'README.md', content: data.content }, ...data.readmes])
+            setActiveFilePath('README.md')
+          } else {
+            setGeneratedFiles([{ path: 'README.md', content: data.content }])
+            setActiveFilePath('README.md')
+          }
           setMarkdown(data.content)
           setSectionOrder(parseSectionOrder(data.content))
           setStep(3)
@@ -676,8 +687,23 @@ export function GeneratePage() {
                       <SelectItem value="friendly">👋 Friendly (Conversational)</SelectItem>
                       <SelectItem value="minimal">🌑 Minimal (Clean & Simple)</SelectItem>
                       <SelectItem value="enterprise">🏢 Enterprise (Detailed & Formal)</SelectItem>
+                      <SelectItem value="humorous">😄 Humorous (Fun & Engaging)</SelectItem>
+                      <SelectItem value="academic">📚 Academic (Rigorous & Detailed)</SelectItem>
+                      <SelectItem value="concise">⚡ Concise (Short & Direct)</SelectItem>
+                      <SelectItem value="storytelling">📖 Storytelling (Narrative-driven)</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-4 pt-2 border-t border-border/40">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Advanced Options</Label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-primary transition-colors">
+                    <Checkbox
+                      checked={generateNested}
+                      onCheckedChange={(c) => setGenerateNested(Boolean(c))}
+                    />
+                    Generate nested READMEs for sub-directories (Monorepos)
+                  </label>
                 </div>
 
                 <div className="space-y-3 pt-2 border-t border-border/40">
@@ -748,9 +774,39 @@ export function GeneratePage() {
             </div>
 
             <TabsContent value="editor" className="mt-0">
-              <div className={cn("grid min-h-[min(640px,calc(100svh-14rem))] gap-4", 
-                layoutMode === 'split' ? "lg:grid-cols-2" : "grid-cols-1"
-              )}>
+              <div className="flex gap-4 min-h-[min(640px,calc(100svh-14rem))]">
+                {generatedFiles.length > 1 && (
+                  <Card className="w-48 flex flex-col min-h-0 hidden md:flex shrink-0 border-border">
+                    <CardHeader className="p-3 border-b bg-muted/20">
+                      <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">Generated Files</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-2 overflow-auto text-sm space-y-1">
+                      {generatedFiles.map(f => (
+                        <button
+                          key={f.path}
+                          className={cn(
+                            "w-full text-left px-3 py-2 rounded-md transition-colors text-xs truncate font-medium",
+                            activeFilePath === f.path ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"
+                          )}
+                          onClick={() => {
+                            const newActive = generatedFiles.find(pf => pf.path === f.path)
+                            if (newActive) {
+                              setMarkdown(newActive.content)
+                              setSectionOrder(parseSectionOrder(newActive.content))
+                              setActiveFilePath(f.path)
+                            }
+                          }}
+                          title={f.path}
+                        >
+                          {f.path}
+                        </button>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+                <div className={cn("grid w-full gap-4", 
+                  layoutMode === 'split' ? "lg:grid-cols-2" : "grid-cols-1"
+                )}>
                 {layoutMode !== 'preview' && (
                   <Card className="flex min-h-0 flex-col overflow-hidden">
                     <CardHeader className="p-2 border-b bg-muted/40 flex flex-row items-center justify-between">
@@ -808,6 +864,7 @@ export function GeneratePage() {
                         value={markdown}
                         onChange={(v) => {
                           setMarkdown(v ?? '')
+                          setGeneratedFiles(prev => prev.map(pf => pf.path === activeFilePath ? { ...pf, content: v ?? '' } : pf))
                           // Attempt to update structure as you type
                           if (v && Math.random() > 0.8) {
                              setSectionOrder(parseSectionOrder(v))
@@ -862,6 +919,7 @@ export function GeneratePage() {
                     </CardContent>
                   </Card>
                 )}
+                </div>
               </div>
             </TabsContent>
 

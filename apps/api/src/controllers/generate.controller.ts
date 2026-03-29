@@ -53,7 +53,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested } = req.body;
     const user = (req as any).user;
 
     const apiKey = req.headers['x-api-key'] as string;
@@ -95,6 +95,21 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       }
     );
 
+    let readmes: { path: string, content: string }[] = [];
+    if (generateNested && finalAnalysis.tree) {
+      readmes = await llmService.generateNestedReadmes(
+        finalAnalysis,
+        provider === 'gemini' ? 'gemini' : 'groq',
+        {
+          sections: features,
+          tone,
+          shields,
+          additionalContext,
+          apiKey
+        }
+      );
+    }
+
 
     // Save the generation to MongoDB associated with the user
     if (process.env.MONGODB_URI && user) {
@@ -111,7 +126,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       }
     }
 
-    res.status(200).json({ content: readmeContent });
+    res.status(200).json({ content: readmeContent, readmes });
   } catch (error: any) {
     console.error('Error generating README:', error);
     res.status(500).json({ error: error.message || 'Failed to generate README' });

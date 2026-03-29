@@ -17,7 +17,9 @@ export class RepoService {
   public async analyzeRepo(repoUrl: string): Promise<ProjectAnalysis> {
     try {
       const { owner, repo } = this.parseRepoUrl(repoUrl);
-      const allFilePaths = await this.getFileStructure(owner, repo);
+      const repoData = await this.getRepoInfo(owner, repo);
+      const defaultBranch = repoData.default_branch || 'main';
+      const allFilePaths = await this.getFileStructure(owner, repo, defaultBranch);
 
       // 1. Fetch metadata files (including nested package.json/go.mod for monorepos)
       const rootMetadata = ['package.json', 'go.mod', 'requirements.txt', 'pyproject.toml', '.env.example', '.env', '.gitignore', 'turbo.json', 'pnpm-workspace.yaml'];
@@ -85,7 +87,7 @@ export class RepoService {
       // 7. Assemble Final Analysis
       const analysis: ProjectAnalysis = {
         name: String(packageMetadata?.name || repo),
-        description: String(packageMetadata?.description || ''),
+        description: String(packageMetadata?.description || repoData?.description || ''),
         language: this.detectLanguage(allFilePaths),
         features: astFeatures.map(f => f.name),
         astFeatures,
@@ -172,9 +174,7 @@ export class RepoService {
     return response.data;
   }
 
-  private async getFileStructure(owner: string, repo: string): Promise<string[]> {
-    const repoData = await this.getRepoInfo(owner, repo);
-    const defaultBranch = repoData.default_branch || 'main';
+  private async getFileStructure(owner: string, repo: string, defaultBranch: string): Promise<string[]> {
     const response = await axios.get(
       `${this.GITHUB_API_URL}/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`,
       {

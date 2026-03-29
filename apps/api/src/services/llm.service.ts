@@ -215,6 +215,59 @@ FINAL CLEANED README:
     return `${header}\n${finalContent}`;
   }
 
+  public async generateNestedReadmes(
+    analysis: any,
+    provider: 'groq' | 'gemini' = 'groq',
+    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string } = {}
+  ): Promise<{ path: string, content: string }[]> {
+    const readmes: { path: string, content: string }[] = [];
+    const tree: string[] = analysis.tree || [];
+    
+    // Find directories containing package.json or go.mod or similar metadata files
+    // This indicates a nested package or app.
+    const nestedDirs = Array.from(new Set(
+      tree
+        .filter(f => f.match(/^(apps|packages)\/[^\/]+\/(package\.json|go\.mod)$/))
+        .map(f => f.replace(/\/(package\.json|go\.mod)$/, ''))
+    ));
+
+    if (nestedDirs.length === 0) return readmes;
+
+    const model = this.createModelInstance(provider, options.apiKey);
+    const targetTone = options.tone || 'professional';
+    const userContext = options.additionalContext || 'No additional context provided.';
+
+    for (const dir of nestedDirs) {
+      // Create a targeted summary prompt for this specific directory
+      const strategyPrompt = `You are a Lead Software Architect. Generate a concise README for a nested sub-project.
+      
+## PROJECT CONTEXT
+Parent Project Name: ${analysis.name}
+Sub-Project Path: ${dir}
+Root Tech Stack: ${analysis.dependencies?.join(', ')}
+
+## TASK
+Generate a short but complete README for this specific sub-component (${dir}).
+Assume it inherits context from the parent project.
+Focus on its specific role, any evident files in its directory (if you can infer), and common installation commands like "cd ${dir} && npm install".
+Maintain an ${targetTone} tone.
+Additional Instructions: ${userContext}
+
+README CONTENT:
+`;
+
+      const draft = await this.callLlm(model, strategyPrompt);
+      const cleanContent = this.cleanLlmOutput(draft);
+
+      readmes.push({
+        path: `${dir}/README.md`,
+        content: `# ${dir.split('/').pop()}\n\n${cleanContent}`
+      });
+    }
+
+    return readmes;
+  }
+
   private cleanLlmOutput(text: string): string {
     let clean = text.trim();
     // Remove triple-backtick markdown blocks ifwrapped by LLM
