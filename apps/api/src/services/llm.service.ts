@@ -7,50 +7,38 @@ import { config } from 'dotenv';
 config();
 
 class LLMService {
-  private groqModel: ChatGroq | null = null;
-  private geminiModel: ChatGoogleGenerativeAI | null = null;
+  constructor() {}
 
-  constructor() {
-    this.initializeModels();
-  }
-
-  private initializeModels() {
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (groqApiKey) {
-      this.groqModel = new ChatGroq({
-        apiKey: groqApiKey,
-        model: 'llama-3.1-8b-instant',
-        temperature: 0.1,
-      });
-    }
-
-    const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (geminiApiKey) {
-      this.geminiModel = new ChatGoogleGenerativeAI({
-        apiKey: geminiApiKey,
+  private createModelInstance(
+    provider: 'groq' | 'gemini',
+    apiKey?: string
+  ): any {
+    if (provider === 'gemini') {
+      const key = apiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+      if (!key) throw new Error('Gemini API Key is missing.');
+      return new ChatGoogleGenerativeAI({
+        apiKey: key,
         model: 'gemini-1.5-flash',
         maxRetries: 2,
         temperature: 0.1,
       });
-    }
-
-    if (!groqApiKey && !geminiApiKey) {
-      console.warn('⚠️ No LLM API keys found. Generation will fail.');
+    } else {
+      const key = apiKey || process.env.GROQ_API_KEY;
+      if (!key) throw new Error('Groq API Key is missing.');
+      return new ChatGroq({
+        apiKey: key,
+        model: 'llama-3.1-8b-instant',
+        temperature: 0.1,
+      });
     }
   }
 
   public async improveContent(
     text: string,
-    provider: 'groq' | 'gemini' = 'groq'
+    provider: 'groq' | 'gemini' = 'groq',
+    apiKey?: string
   ): Promise<string> {
-    let model;
-    if (provider === 'gemini' && this.geminiModel) {
-      model = this.geminiModel;
-    } else if (this.groqModel) {
-      model = this.groqModel;
-    } else {
-      throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
-    }
+    const model = this.createModelInstance(provider, apiKey);
 
     const improvementTemplate = `You are an expert technical writer. Improve the following markdown content by making it more professional, clear, and concise. 
 Maintain the original markdown formatting (bold, links, code blocks).
@@ -69,16 +57,10 @@ IMPROVED OUTPUT:
 
   public async getRecommendations(
     analysis: any,
-    provider: 'groq' | 'gemini' = 'groq'
+    provider: 'groq' | 'gemini' = 'groq',
+    apiKey?: string
   ): Promise<{ sections: string[]; tone: string; reason: string }> {
-    let model: any;
-    if (provider === 'gemini' && this.geminiModel) {
-      model = this.geminiModel;
-    } else if (this.groqModel) {
-      model = this.groqModel;
-    } else {
-      throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
-    }
+    const model = this.createModelInstance(provider, apiKey);
 
     const recommendationPrompt = `You are a Senior Developer Advocate. Based on the provided project analysis, suggest the ideal README structure and tone.
     
@@ -104,7 +86,6 @@ RECOMMENDATION JSON:
 `;
     const response = await model.pipe(new StringOutputParser()).invoke(recommendationPrompt);
     try {
-      // Find the first '{' and the last '}' to extract only the JSON object
       const start = response.indexOf('{');
       const end = response.lastIndexOf('}');
       if (start === -1 || end === -1) throw new Error('Could not find JSON object in response.');
@@ -120,17 +101,9 @@ RECOMMENDATION JSON:
   public async generateReadme(
     analysis: any,
     provider: 'groq' | 'gemini' = 'groq',
-    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string } = {}
+    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string } = {}
   ): Promise<string> {
-
-    let model: any;
-    if (provider === 'gemini' && this.geminiModel) {
-      model = this.geminiModel;
-    } else if (this.groqModel) {
-      model = this.groqModel;
-    } else {
-      throw new Error(`LLM Provider ${provider} is not configured or unavailable.`);
-    }
+    const model = this.createModelInstance(provider, options.apiKey);
 
     const targetTone = options.tone || 'professional';
     const targetSections = options.sections || ['Installation', 'Usage', 'Features'];
@@ -160,7 +133,7 @@ Maintain an ${targetTone} tone.
 
 OVERVIEW:
 `;
-    const overview = await model.pipe(new StringOutputParser()).invoke(strategyPrompt);
+    const overview = await this.callLlm(model, strategyPrompt);
 
     // Step 2: Architecture & Directory Mapping
     const architecturePrompt = `You are a Lead Software Architect. Map the codebase structure to a functional narrative.
@@ -170,12 +143,15 @@ ${analysis.tree?.slice(0, 100).join('\n') || 'Not specified'}
 
 ## TASK
 Explain the project's "Technical Architecture". 
-Don't just list folders; explain HOW data flows or HOW components interact based on the directory names (e.g. "The /apps/api directory handles request normalization and passes context to...")
+Don't just list folders; explain HOW data flows or HOW components interact based on the directory names.
 Return a detailed 2-3 paragraph architecture summary.
 
 ARCHITECTURE SUMMARY:
 `;
-    const architectureSummary = await model.pipe(new StringOutputParser()).invoke(architecturePrompt);
+    const architectureSummary = await this.callLlm(model, architecturePrompt);
+
+    // Step 2.5: Context Distillation (Chunked)
+    const distilledEvidence = await this.distillProjectEvidence(model, analysis.evidence, targetTone);
 
     // Step 3: Enterprise-Grade Generation (The "n8n" Pass)
     const generationPrompt = `You are a Senior Technical Writer. Generate the full body of a professional, "n8n-style" README.md.
@@ -183,23 +159,23 @@ ARCHITECTURE SUMMARY:
 ## INPUTS
 Header Overview: ${overview}
 Architecture: ${architectureSummary}
-Detected Features & Snippets: ${JSON.stringify(analysis.evidence, null, 2)}
+Distilled Technical Logic: ${distilledEvidence}
 Tech Stack: ${analysis.dependencies?.join(', ')}
 Requested Sections: ${targetSections.join(', ')}
 Tone: ${targetTone}
 Instructions: ${userContext}
 
-## RULES (COMPREHENSIVE MODE)
+## RULES (COMPENSATIVE MODE)
 1. Title should be "# ${analysis.name}".
 2. Start with the "Strategic Overview" followed by "Technical Architecture".
-3. For every "Feature", provide a technical deep-dive. Use the provided code snippets (evidence) to explain the implementation.
+3. Use the "Distilled Technical Logic" to write detailed feature walkthroughs.
 4. Structure the output clearly with H2 headings.
 5. Emphasize Developer Experience (DX).
 6. Total depth should be at least 1500 words of technical content.
 
 README CONTENT:
 `;
-    const draft = await model.pipe(new StringOutputParser()).invoke(generationPrompt);
+    const draft = await this.callLlm(model, generationPrompt);
 
     // Step 4: Technical Integrity Audit
     const auditPrompt = `You are a Senior Technical Editor. Verify and Polish the README.
@@ -215,11 +191,80 @@ ${draft}
 
 FINAL ENTERPRISE README.md:
 `;
-    const finalContent = await model.pipe(new StringOutputParser()).invoke(auditPrompt);
+    const finalContent = await this.callLlm(model, auditPrompt);
 
     // Combine all pieces
     const header = `# ${analysis.name}\n\n${shieldsMarkdown}\n\n${navbar}\n\n`;
     return `${header}\n${finalContent}`;
+  }
+
+  /**
+   * Safe wrapper for LLM calls with retry/fallback logic
+   */
+  private async callLlm(model: any, prompt: string, retryCount = 0): Promise<string> {
+    try {
+      return await model.pipe(new StringOutputParser()).invoke(prompt);
+    } catch (err: any) {
+      // 413 = Payload Too Large, 429 = Rate Limit
+      if ((err?.status === 413 || err?.status === 429) && retryCount < 2) {
+        console.warn(`LLM Overloaded (Status ${err.status}), retrying or falling back...`);
+        // If it's a 413, try to use gemini if configured and not already using it
+        if (err.status === 413 && process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+           const geminiFallback = this.createModelInstance('gemini');
+           return this.callLlm(geminiFallback, prompt, retryCount + 1);
+        }
+        // Otherwise wait a bit and retry
+        await new Promise(res => setTimeout(res, 2000 * (retryCount + 1)));
+        return this.callLlm(model, prompt, retryCount + 1);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Distills large codebase evidence into high-density technical summaries using chunked parallel processing.
+   */
+  private async distillProjectEvidence(model: any, evidence: any, tone: string): Promise<string> {
+    if (!evidence?.files || evidence.files.length === 0) return 'No codebase evidence found.';
+
+    const MAX_CHARS_PER_CHUNK = 8000; // Aiming for roughly 3000-4000 tokens
+    const chunks: any[][] = [];
+    let currentChunk: any[] = [];
+    let currentCharCount = 0;
+
+    for (const file of evidence.files) {
+      const fileContent = JSON.stringify(file);
+      if (currentCharCount + fileContent.length > MAX_CHARS_PER_CHUNK && currentChunk.length > 0) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentCharCount = 0;
+      }
+      currentChunk.push(file);
+      currentCharCount += fileContent.length;
+    }
+    if (currentChunk.length > 0) chunks.push(currentChunk);
+
+    console.log(`Distilling codebase context in ${chunks.length} parallel batches...`);
+
+    // Process all chunks in parallel
+    const distillationPromises = chunks.map(async (batch, index) => {
+      const batchPrompt = `Extract the core technical logic and implementation details from these code snippets.
+Focused on explaining *HOW* things work for an enterprise README.
+
+## BATCH ${index + 1} ASSETS:
+${JSON.stringify(batch, null, 2)}
+
+## TASK
+Return a 2-paragraph technical summary of the logic found in this batch.
+TONE: ${tone}
+
+TECHNICAL SUMMARY:
+`;
+      return this.callLlm(model, batchPrompt);
+    });
+
+    const summaries = await Promise.all(distillationPromises);
+    return summaries.join('\n\n');
   }
 
   private generateNavbar(analysis: any): string {
@@ -255,4 +300,3 @@ FINAL ENTERPRISE README.md:
 }
 
 export const llmService = new LLMService();
-

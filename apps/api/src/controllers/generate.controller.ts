@@ -25,6 +25,14 @@ export const analyzeRepository = async (req: Request, res: Response): Promise<vo
 export const getRecommendations = async (req: Request, res: Response): Promise<void> => {
   try {
     const { analysis, provider } = req.body;
+    const apiKey = req.headers['x-api-key'] as string;
+    const user = (req as any).user;
+
+    if (!user && !apiKey) {
+      res.status(401).json({ error: 'Unauthorized: No user session or API key provided' });
+      return;
+    }
+
     if (!analysis) {
       res.status(400).json({ error: 'Analysis data is required for recommendations' });
       return;
@@ -32,7 +40,8 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
     const recommendations = await llmService.getRecommendations(
       analysis,
-      provider === 'gemini' ? 'gemini' : 'groq'
+      provider === 'gemini' ? 'gemini' : 'groq',
+      apiKey
     );
 
     res.status(200).json(recommendations);
@@ -46,6 +55,12 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
   try {
     const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext } = req.body;
     const user = (req as any).user;
+
+    const apiKey = req.headers['x-api-key'] as string;
+    if (!user && !apiKey) {
+      res.status(401).json({ error: 'Unauthorized: No user session or API key provided' });
+      return;
+    }
 
     if (!title && !repoUrl) {
       res.status(400).json({ error: 'Title or Repository URL is required' });
@@ -75,7 +90,8 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
         sections: features, // 'features' from frontend map to the array of section names
         tone,
         shields,
-        additionalContext
+        additionalContext,
+        apiKey
       }
     );
 
@@ -118,6 +134,13 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
 export const improveSection = async (req: Request, res: Response): Promise<void> => {
   try {
     const { text, provider } = req.body;
+    const apiKey = req.headers['x-api-key'] as string;
+    const user = (req as any).user;
+
+    if (!user && !apiKey) {
+      res.status(401).json({ error: 'Unauthorized: No user session or API key provided' });
+      return;
+    }
 
     if (!text || text.trim().length === 0) {
       res.status(400).json({ error: 'Text to improve is required' });
@@ -126,7 +149,8 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
 
     const improvedContent = await llmService.improveContent(
       text,
-      provider === 'gemini' ? 'gemini' : 'groq'
+      provider === 'gemini' ? 'gemini' : 'groq',
+      apiKey
     );
 
     res.status(200).json({ content: improvedContent });
