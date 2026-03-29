@@ -43,6 +43,7 @@ export class LocalAnalyzerService {
     );
 
     for (const file of metadataFiles) {
+      console.log(`  🔍 Found metadata file: ${file}`);
       fileContents[file] = fs.readFileSync(path.join(this.rootPath, file), 'utf8');
     }
 
@@ -52,11 +53,13 @@ export class LocalAnalyzerService {
     // 3. Package Metadata
     const packageMetadata = await PackageParser.parse(fileContents);
 
-    // 4. Trace Imports (Simplified locally or just use structure.importantFiles)
+    // 4. Trace Imports (Improved with TraceAnalyzer)
+    const trace = TraceAnalyzer.analyze(structure.entryPoints, fileContents);
     const importantFiles = Array.from(new Set([
       ...structure.entryPoints, 
-      ...structure.importantFiles
-    ])).slice(0, 50); // Limit context size
+      ...structure.importantFiles,
+      ...trace.topFiles
+    ])).slice(0, 60); // Slightly larger limit for trace data
 
     const importantContents: Record<string, string> = { ...fileContents };
 
@@ -71,6 +74,9 @@ export class LocalAnalyzerService {
     const envVars = EnvExtractor.extract(importantContents);
     const astFeatures = AstFeatureDetector.detect(importantContents);
     const definitionsMap = DefinitionExtractor.extract(importantContents);
+    const dbSchemas = SchemaAnalyzer.analyze(importantContents);
+    const examples = ExampleAnalyzer.analyze(importantContents);
+    const devOps = DevOpsAnalyzer.analyze(importantContents);
 
     // 6. Evidence collection
     const evidence = {
@@ -87,6 +93,9 @@ export class LocalAnalyzerService {
       language: this.detectLanguage(allFilePaths),
       features: astFeatures.map(f => f.name),
       astFeatures,
+      dbSchemas,
+      examples,
+      devOps,
       framework: packageMetadata?.frameworks?.[0] ? {
         name: packageMetadata.frameworks[0],
         confidence: 0.9,
@@ -106,6 +115,7 @@ export class LocalAnalyzerService {
       hasDocker: structure.hasDocker,
       tree: structure.tree,
       keyDirectories: structure.keyDirectories,
+      isMonorepo: structure.isMonorepo,
       evidence
     };
 

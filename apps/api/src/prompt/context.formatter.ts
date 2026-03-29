@@ -5,6 +5,9 @@ export interface ExtractedData {
   api: { endpoints: any[]; totalCount: number };
   configuration: { envVars: any[]; configFiles: string[] };
   codeSamples: any[];
+  dbSchemas?: any[];
+  examples?: any[];
+  devOps?: any;
 }
 
 export class ContextFormatter {
@@ -36,6 +39,9 @@ export class ContextFormatter {
           "detected_routes": api.endpoints,
           "configuration_keys": configuration.envVars
         },
+        "database_architecture": data.dbSchemas || [],
+        "usage_examples": data.examples || [],
+        "infrastructure_devops": data.devOps || {},
         "codebase_evidence_ast": codeSamples.map(sample => ({
           "file_path": sample.filePath,
           "signatures": sample.signatures || []

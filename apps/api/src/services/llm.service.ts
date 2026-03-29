@@ -121,16 +121,18 @@ RECOMMENDATION JSON:
 Framework: ${analysis.framework?.name || 'Unknown'}
 Production Dependencies: ${analysis.dependencies?.join(', ')}
 Key Directories: ${analysis.keyDirectories?.join(', ') || 'Not specified'}
+Database Models: ${JSON.stringify(analysis.dbSchemas || [], null, 2)}
+Infrastructure/DevOps: ${JSON.stringify(analysis.devOps || {}, null, 2)}
 
 ## STRICTOR GROUNDING RULES (ANTI-HALLUCINATION):
 1. Only describe what is explicitly found in the evidence.
-2. If there is no "Dockerfile", do not mention Docker.
+2. If there is no "Dockerfile" or "docker" metadata, do not mention Docker.
 3. If there is no "tests" folder, do not mention testing.
 4. Use the description from package.json if available: "${analysis.description || 'No description'}".
 
 ## TASK
 Synthesize a 2-paragraph "Technical Overview". 
-Focus on explaining *WHAT* this codebase actually is and *HOW* it is structured based on the directories.
+Focus on explaining *WHAT* this codebase actually is and *HOW* its models and infrastructure are structured.
 Maintain an ${targetTone} tone.
 
 OVERVIEW:
@@ -159,45 +161,72 @@ ARCHITECTURE SUMMARY:
     // Step 2.5: Fact Distillation (The "Truth Map")
     const technicalTruthMap = await this.distillProjectEvidence(model, analysis.evidence, targetTone);
 
-    // Step 3: Fact-Driven Content Generation (The Grounded Pass)
+// Step 3: Fact-Driven Content Generation (The Grounded Pass)
     const generationPrompt = `You are a Senior Technical Writer. Generate a comprehensive README.md.
-
+ 
 ## SOURCE OF TRUTH (STRICTLY USE ONLY THIS):
 Summary: ${overview}
 Architecture: ${architectureSummary}
 Technical Truth Map: ${technicalTruthMap}
+Usage Examples (from tests): ${JSON.stringify(analysis.examples || [], null, 2)}
 Tech Stack: ${analysis.dependencies?.join(', ')}
-
+ 
 ## RULES (THE "CURSOR" STRATEGY):
 1. **STRICT GROUNDING**: Do not mention a single feature or dependency that isn't in the Source of Truth above.
 2. **ZERO FILLER**: Avoid generic marketing jargon. Use technical detail from the signatures.
 3. **CITATIONS**: When describing a feature, mention the file or class from the truth map where it lives.
-4. **NO PLACEHOLDERS**: Do not use [Project Name] - use "${analysis.name}".
-5. **TONE**: ${targetTone}.
-
+4. **USAGE SECTION**: Include a "Usage" section that simplifies the provided "Usage Examples" from the tests.
+5. **NO PLACEHOLDERS**: Do not use [Project Name] - use "${analysis.name}".
+6. **TONE**: ${targetTone}.
+ 
 README CONTENT:
 `;
     const draft = await this.callLlm(model, generationPrompt);
 
-    // Step 4: Final Hallucination Audit
-    const auditPrompt = `You are a Technical Editor. Perform a final Hallucination Audit on this README.
+    // Step 4: Final Hallucination Audit (Silent Proofreader)
+    const auditPrompt = `You are a Technical Editor. Perform a final Silent Audit on this README.
     
-## AUDIT PROTOCOL:
-1. Scan for features not supported by the dependencies: ${analysis.dependencies?.join(', ')}.
-2. Scan for folders not present in the tree: ${analysis.keyDirectories?.join(', ')}.
-3. **If you find a hallucinated feature, DELETE IT completely.**
-4. Apply ${targetTone} polish.
+## VERIFIED TECHNICAL TRUTH (DO NOT DELETE THESE):
+Dependencies: ${analysis.dependencies?.join(', ')}
+Key Folders: ${analysis.keyDirectories?.join(', ')}
+Technical Signatures: ${technicalTruthMap}
 
-DRAFT README:
+## AUDIT PROTOCOL:
+1. Cross-reference the draft below with the Verified Technical Truth above.
+2. If the draft contains a feature (like Kafka, Redis, or a local service) that is in the Technical Signatures, it is REAL. KEEP IT.
+3. **If you find a feature that has ZERO evidence in both the signatures and dependencies, DELETE IT.**
+4. Remove any conversational intros like "Here is the README".
+5. DO NOT provide an audit report. DO NOT include headers like "ISSUES FOUND" or "DRAFT".
+
+## TASK
+Return the finalized, cleaned README.md content. 
+Your output MUST start with "#" and nothing else.
+
+DRAFT TO AUDIT:
 ${draft}
 
-FINAL AUDITED README.md:
+FINAL CLEANED README:
 `;
-    const finalContent = await this.callLlm(model, auditPrompt);
+    const auditResponse = await this.callLlm(model, auditPrompt);
+    const finalContent = this.cleanLlmOutput(auditResponse);
 
     // Combine all pieces
     const header = `# ${analysis.name}\n\n${shieldsMarkdown}\n\n${navbar}\n\n`;
     return `${header}\n${finalContent}`;
+  }
+
+  private cleanLlmOutput(text: string): string {
+    let clean = text.trim();
+    // Remove triple-backtick markdown blocks ifwrapped by LLM
+    clean = clean.replace(/^```markdown\n/i, '').replace(/^```\n/i, '').replace(/\n```$/i, '');
+    // Remove "Final Audited README" style prefixes
+    clean = clean.replace(/^(Final|Audited|Cleaned)?\s*README(\.md)?:?\s*\n*/i, '');
+    // Ensure it starts with #
+    const hashIndex = clean.indexOf('#');
+    if (hashIndex > -1) {
+      clean = clean.substring(hashIndex);
+    }
+    return clean;
   }
 
   private async callLlm(model: any, prompt: string, retryCount = 0): Promise<string> {

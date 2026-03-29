@@ -46,12 +46,15 @@ export class PackageParser {
     sortedPaths.forEach((path, index) => {
       try {
         const pkg = JSON.parse(allFiles[path]);
-        const prefix = path.includes('/') ? `${path.split('/')[0]}:` : '';
+        // Normalize path for splitting
+        const normalizedPath = path.replace(/\\/g, '/');
+        const prefix = normalizedPath.includes('/') ? `${normalizedPath.split('/')[0]}:` : '';
 
-        if (index === 0) {
-          primaryName = pkg.name || '';
-          primaryDescription = pkg.description || '';
-          primaryVersion = pkg.version || '0.0.0';
+        // If no primary metadata yet, or if current one is more descriptive, pick it
+        if (!primaryName || (index === 0 && pkg.name)) {
+          primaryName = pkg.name || primaryName;
+          primaryDescription = pkg.description || primaryDescription;
+          primaryVersion = pkg.version || primaryVersion;
         }
 
         // Merge scripts with prefix if not root

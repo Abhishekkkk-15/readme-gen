@@ -38,6 +38,34 @@ export interface ProjectAnalysis {
     }[];
   }[];
 
+  dbSchemas?: {
+    model: string;
+    fields: string[];
+    file: string;
+  }[];
+
+  examples?: {
+    description: string;
+    code: string;
+    file: string;
+  }[];
+
+  devOps?: {
+    docker?: {
+      baseImage?: string;
+      ports?: string[];
+      command?: string;
+    };
+    compose?: {
+      services: string[];
+      networks: string[];
+    };
+    pipeline?: {
+      provider: string; // e.g. "GitHub Actions"
+      jobs: string[];
+    };
+  };
+
   evidence: {
     files: {
       path: string;
