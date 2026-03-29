@@ -12,65 +12,42 @@ export class ContextFormatter {
     const { packageMetadata, structure, techStack, api, configuration, codeSamples } = data;
 
     return {
-      projectOverview: {
-        name: packageMetadata?.name || 'Unknown Project',
-        type: packageMetadata?.frameworks?.[0] || 'Generic',
-        language: this.detectLanguage(packageMetadata, structure),
-        framework: packageMetadata?.frameworks?.[0] || 'N/A',
-        frameworks: packageMetadata?.frameworks || [],
-        packageManager: packageMetadata?.packageManager || 'npm'
-      },
-      structure: {
-        entryPoints: structure.entryPoints,
-        keyDirectories: structure.keyDirectories,
-        importantFiles: structure.importantFiles,
-        tree: structure.tree
-      },
-      techStack: {
-        core: techStack.core,
-        database: techStack.database,
-        testing: techStack.testing,
-        deployment: techStack.deployment
-      },
-      scripts: {
-        available: Object.keys(packageMetadata?.scripts || {}),
-        actualCommands: packageMetadata?.scripts || {}
-      },
-      api: {
-        endpoints: api.endpoints,
-        totalCount: api.totalCount
-      },
-      configuration: {
-        envVars: configuration.envVars,
-        configFiles: configuration.configFiles
-      },
-      dependencies: {
-        production: packageMetadata?.dependencies?.production || [],
-        development: packageMetadata?.dependencies?.development || [],
-        peer: packageMetadata?.dependencies?.peer || []
-      },
-      metadata: {
-        version: packageMetadata?.version || '1.0.0',
-        author: packageMetadata?.author || 'Auto-generated',
-        license: packageMetadata?.license || 'MIT',
-        repository: packageMetadata?.repository || ''
-      },
-      codeInsights: codeSamples.map(sample => ({
-        file: sample.filePath,
-        exports: sample.exports,
-        signatures: sample.signatures,
-        docstrings: sample.docstrings
-      }))
+      "PROJECT_MANIFESTO": {
+        "identity": {
+          "name": packageMetadata?.name || 'Unknown Project',
+          "version": packageMetadata?.version || '1.0.0',
+          "description": packageMetadata?.description || 'No description provided.',
+          "framework": packageMetadata?.frameworks?.[0] || 'Generic Node.js',
+          "language": this.detectLanguage(structure)
+        },
+        "technical_stack": {
+          "runtime": "Node.js",
+          "package_manager": packageMetadata?.packageManager || 'npm',
+          "dependencies_prod": packageMetadata?.dependencies?.production || [],
+          "dependencies_dev": packageMetadata?.dependencies?.development || [],
+          "inferred_tech": techStack
+        },
+        "file_system_hierarchy": {
+          "entry_points": structure.entryPoints,
+          "key_directories": structure.keyDirectories,
+          "full_tree_snapshot": structure.tree?.slice(0, 150) // High-density look at the structure
+        },
+        "api_surface": {
+          "detected_routes": api.endpoints,
+          "configuration_keys": configuration.envVars
+        },
+        "codebase_evidence_ast": codeSamples.map(sample => ({
+          "file_path": sample.filePath,
+          "signatures": sample.signatures || []
+        }))
+      }
     };
   }
 
-  private static detectLanguage(pkg: any, structure: any): string {
-    const files = structure.importantFiles.join(' ');
+  private static detectLanguage(structure: any): string {
+    const files = (structure.importantFiles || []).join(' ') + (structure.tree || []).join(' ');
     if (files.includes('.ts')) return 'TypeScript';
     if (files.includes('.js')) return 'JavaScript';
-    if (files.includes('.py')) return 'Python';
-    if (files.includes('.go')) return 'Go';
-    if (files.includes('.rs')) return 'Rust';
-    return 'Unknown';
+    return 'JavaScript/Node.js';
   }
 }

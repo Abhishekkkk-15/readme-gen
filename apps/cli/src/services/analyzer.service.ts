@@ -34,7 +34,7 @@ export class LocalAnalyzerService {
 
     // 1. Fetch metadata files (package.json, go.mod, etc.)
     const metadataFiles = allFilePaths.filter(f => 
-      f.endsWith('package.json') || 
+      f.includes('package.json') || 
       f.endsWith('go.mod') || 
       f.endsWith('requirements.txt') || 
       f.endsWith('pyproject.toml') ||

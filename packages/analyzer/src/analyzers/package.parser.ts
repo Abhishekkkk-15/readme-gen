@@ -14,9 +14,12 @@ export interface PackageMetadata {
 
 export class PackageParser {
   public static async parse(files: Record<string, string>): Promise<PackageMetadata | null> {
-    if (files['package.json']) {
-      return this.parseNode(files['package.json'], files);
+    const packageFiles = Object.keys(files).filter(f => f.endsWith('package.json'));
+    
+    if (packageFiles.length > 0) {
+      return this.parseMultipleNode(packageFiles, files);
     }
+
     if (files['requirements.txt'] || files['pyproject.toml']) {
       return this.parsePython(files['requirements.txt'] || '', files['pyproject.toml'] || '');
     }
@@ -26,50 +29,93 @@ export class PackageParser {
     return null;
   }
 
-  private static parseNode(content: string, allFiles: Record<string, string>): PackageMetadata {
-    try {
-      const pkg = JSON.parse(content);
-      const deps = pkg.dependencies || {};
-      const devDeps = pkg.devDependencies || {};
-      const peerDeps = pkg.peerDependencies || {};
+  private static parseMultipleNode(packagePaths: string[], allFiles: Record<string, string>): PackageMetadata {
+    const mergedScripts: Record<string, string> = {};
+    const mergedDeps = new Set<string>();
+    const mergedDevDeps = new Set<string>();
+    const mergedPeerDeps = new Set<string>();
+    const mergedFrameworks = new Set<string>();
+    
+    let primaryName = '';
+    let primaryDescription = '';
+    let primaryVersion = '0.0.0';
 
-      const frameworks: string[] = [];
-      if (deps['express']) frameworks.push('Express');
-      if (deps['react']) frameworks.push('React');
-      if (deps['next']) frameworks.push('Next.js');
-      if (deps['vue']) frameworks.push('Vue');
-      if (deps['@nestjs/core']) frameworks.push('NestJS');
-      if (deps['koa']) frameworks.push('Koa');
-      if (deps['fastify']) frameworks.push('Fastify');
+    // Sort paths by depth (shallowest first) to pick primary metadata from root
+    const sortedPaths = [...packagePaths].sort((a, b) => a.split('/').length - b.split('/').length);
 
-      let packageManager = 'npm';
-      if (allFiles['pnpm-lock.yaml']) packageManager = 'pnpm';
-      else if (allFiles['yarn.lock']) packageManager = 'yarn';
+    sortedPaths.forEach((path, index) => {
+      try {
+        const pkg = JSON.parse(allFiles[path]);
+        const prefix = path.includes('/') ? `${path.split('/')[0]}:` : '';
 
-      return {
-        name: pkg.name || '',
-        version: pkg.version || '0.0.0',
-        description: pkg.description || '',
-        scripts: pkg.scripts || {},
-        dependencies: {
-          production: Object.keys(deps),
-          development: Object.keys(devDeps),
-          peer: Object.keys(peerDeps),
-        },
-        frameworks,
-        packageManager,
-      };
-    } catch {
-      return {
-        name: 'Unknown Node Project',
-        version: '0.0.0',
-        description: '',
-        scripts: {},
-        dependencies: { production: [], development: [], peer: [] },
-        frameworks: [],
-        packageManager: 'npm',
-      };
-    }
+        if (index === 0) {
+          primaryName = pkg.name || '';
+          primaryDescription = pkg.description || '';
+          primaryVersion = pkg.version || '0.0.0';
+        }
+
+        // Merge scripts with prefix if not root
+        if (pkg.scripts) {
+          Object.entries(pkg.scripts as Record<string, string>).forEach(([name, cmd]) => {
+            const key = prefix ? `${prefix}${name}` : name;
+            mergedScripts[key] = cmd;
+          });
+        }
+
+        // Merge dependencies
+        if (pkg.dependencies) {
+          Object.keys(pkg.dependencies).forEach(d => {
+            mergedDeps.add(d);
+            this.detectFramework(d, mergedFrameworks);
+          });
+        }
+        if (pkg.devDependencies) {
+          Object.keys(pkg.devDependencies).forEach(d => mergedDevDeps.add(d));
+        }
+        if (pkg.peerDependencies) {
+          Object.keys(pkg.peerDependencies).forEach(d => mergedPeerDeps.add(d));
+        }
+      } catch (e) {
+        console.warn(`Failed to parse ${path}:`, e);
+      }
+    });
+
+    let packageManager = 'npm';
+    if (Object.keys(allFiles).some(f => f.includes('pnpm-lock.yaml'))) packageManager = 'pnpm';
+    else if (Object.keys(allFiles).some(f => f.includes('yarn.lock'))) packageManager = 'yarn';
+
+    return {
+      name: primaryName || 'Unknown Node Project',
+      version: primaryVersion,
+      description: primaryDescription,
+      scripts: mergedScripts,
+      dependencies: {
+        production: Array.from(mergedDeps),
+        development: Array.from(mergedDevDeps),
+        peer: Array.from(mergedPeerDeps),
+      },
+      frameworks: Array.from(mergedFrameworks),
+      packageManager,
+    };
+  }
+
+  private static detectFramework(dep: string, frameworks: Set<string>) {
+    const frameworkMap: Record<string, string> = {
+      'express': 'Express',
+      'react': 'React',
+      'next': 'Next.js',
+      'vue': 'Vue',
+      '@nestjs/core': 'NestJS',
+      'koa': 'Koa',
+      'fastify': 'Fastify',
+      'socket.io': 'Socket.io',
+      'mongoose': 'Mongoose',
+      'prisma': 'Prisma',
+      'tailwindcss': 'TailwindCSS',
+      'vite': 'Vite'
+    };
+
+    if (frameworkMap[dep]) frameworks.add(frameworkMap[dep]);
   }
 
   private static parsePython(reqs: string, pyproject: string): PackageMetadata {

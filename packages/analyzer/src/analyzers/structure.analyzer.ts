@@ -13,6 +13,7 @@ export class StructureAnalyzer {
     keyDirectories: string[];
     importantFiles: string[];
     hasDocker: boolean;
+    isMonorepo: boolean;
     tree: string[];
   }> {
     const ig = ignore().add(gitignoreContent || '');
@@ -23,15 +24,27 @@ export class StructureAnalyzer {
     
     // Key directories detection
     const directories = new Set<string>();
+    const keyPatterns = ['src', 'lib', 'app', 'tests', 'docs', 'config', 'packages', 'apps', 'controllers', 'routes', 'services'];
+    
     filteredFiles.forEach(f => {
       const parts = f.split('/');
-      if (parts.length > 1) {
-        directories.add(parts[0]);
-      }
+      parts.forEach(part => {
+        if (keyPatterns.includes(part.toLowerCase())) {
+          directories.add(part);
+        }
+      });
     });
-    const keyDirs = Array.from(directories).filter(d => ['src', 'lib', 'app', 'tests', 'docs', 'config', 'packages', 'apps'].includes(d));
+    const keyDirs = Array.from(directories);
 
     const hasDocker = filteredFiles.some(f => f.toLowerCase().includes('dockerfile') || f.toLowerCase().includes('docker-compose'));
+
+    // Monorepo detection
+    const isMonorepo = filteredFiles.some(f => 
+      f === 'pnpm-workspace.yaml' || 
+      f === 'lerna.json' || 
+      f === 'turbo.json' ||
+      (f === 'package.json' && filteredFiles.some(file => file.startsWith('packages/') || file.startsWith('apps/')))
+    );
 
     // Scored files
     const scoredFiles = filteredFiles.map(f => ({
@@ -44,6 +57,7 @@ export class StructureAnalyzer {
       keyDirectories: keyDirs,
       importantFiles: scoredFiles.slice(0, 40).map(f => f.path),
       hasDocker,
+      isMonorepo,
       tree: this.generateTreeSnippet(filteredFiles, 3)
     };
   }
