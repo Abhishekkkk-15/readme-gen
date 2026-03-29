@@ -11,8 +11,8 @@ export class ApiService {
 
   public async generateReadme(
     analysis: ProjectAnalysis,
-    options: { tone?: string; shields?: string[]; sections?: string[] } = {}
-  ): Promise<string> {
+    options: { tone?: string; shields?: string[]; sections?: string[]; generateNested?: boolean } = {}
+  ): Promise<{ content: string; readmes?: { path: string, content: string }[] }> {
     const provider = configManager.get('provider');
     const groqKey = configManager.get('groqKey');
     const openaiKey = configManager.get('openaiKey');
@@ -32,10 +32,7 @@ export class ApiService {
         analysis,
         tone: options.tone || 'professional',
         shields: options.shields || ['license', 'stars'],
-        // Passing the key as a header or body param? 
-        // Based on generate.controller.ts, it uses process.env keys currently.
-        // But for a CLI, we should probably pass the key so the backend doesn't need it.
-        // Wait, the backend llmService needs the key.
+        generateNested: options.generateNested
       }, {
         headers: {
           'x-api-key': apiKey,
@@ -43,7 +40,7 @@ export class ApiService {
         }
       });
 
-      return response.data.content;
+      return { content: response.data.content, readmes: response.data.readmes };
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message;
       throw new Error(`Backend Error: ${msg}`);

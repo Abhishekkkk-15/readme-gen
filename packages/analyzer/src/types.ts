@@ -29,6 +29,7 @@ export interface ProjectAnalysis {
 
   tree?: string[];
   keyDirectories?: string[];
+  isMonorepo?: boolean;
 
   astFeatures: {
     name: string;

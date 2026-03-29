@@ -29,6 +29,7 @@ program
   .option('-t, --tone <tone>', 'Set the README tone (professional, friendly, minimal, enterprise)')
   .option('-o, --output <file>', 'Output filename', 'README.md')
   .option('-y, --yes', 'Automatically answer yes to prompt (non-interactive)')
+  .option('-n, --nested', 'Generate nested READMEs for sub-directories (Monorepos)')
   .action(generateCommand);
 
 program

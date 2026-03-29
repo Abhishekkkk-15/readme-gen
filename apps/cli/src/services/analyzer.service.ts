@@ -9,6 +9,10 @@ import {
   RouteExtractor, 
   EnvExtractor, 
   DefinitionExtractor,
+  TraceAnalyzer,
+  SchemaAnalyzer,
+  ExampleAnalyzer,
+  DevOpsAnalyzer,
   ProjectAnalysis
 } from '@readme-gen/analyzer';
 

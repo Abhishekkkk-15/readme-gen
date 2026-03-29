@@ -112,8 +112,7 @@ RECOMMENDATION JSON:
     // Step 0: Pre-Generation (Navbar & Shields)
     const navbar = this.generateNavbar(analysis);
     const shieldsMarkdown = this.generateShields(options.shields || [], analysis);
-    console.log(analysis)
-    console.log(analysis.evidence.files[0].snippets)
+
     // Step 1: Technical Capabilities Mapping (Truth Pass)
     const strategyPrompt = `You are a Lead Software Architect. Map the codebase evidence to a reality-based summary.
     
@@ -227,9 +226,17 @@ FINAL CLEANED README:
     // This indicates a nested package or app.
     const nestedDirs = Array.from(new Set(
       tree
-        .filter(f => f.match(/^(apps|packages)\/[^\/]+\/(package\.json|go\.mod)$/))
-        .map(f => f.replace(/\/(package\.json|go\.mod)$/, ''))
-    ));
+        .filter(f => {
+          const normalized = f.replace(/\\/g, '/');
+          return normalized.match(/(?:^|\/)(?:apps|packages)\/[^\/]+\/(?:package\.json|go\.mod)$/);
+        })
+        .map(f => {
+          const normalized = f.replace(/\\/g, '/');
+          const match = normalized.match(/(.*)\/(?:package\.json|go\.mod)$/);
+          return match ? match[1] : null;
+        })
+        .filter(Boolean)
+    )) as string[];
 
     if (nestedDirs.length === 0) return readmes;
 

@@ -7,7 +7,7 @@ import { LocalAnalyzerService } from '../services/analyzer.service.js';
 import { apiService } from '../services/api.service.js';
 import { configManager } from '../config/config-manager.js';
 
-export async function generateCommand(options: { tone?: string; output?: string; yes?: boolean }) {
+export async function generateCommand(options: { tone?: string; output?: string; yes?: boolean; nested?: boolean }) {
   if (!configManager.isConfigured()) {
     console.log(chalk.red('\n❌ CLI is not configured. Run "readmegen init" first.\n'));
     return;
@@ -21,9 +21,10 @@ export async function generateCommand(options: { tone?: string; output?: string;
     const analysis = await analyzer.analyze();
     spinner.succeed('Project analyzed successfully!');
 
-    // 2. Interaction (Optional: confirm sections/tone if not --yes)
+    // 2. Interaction
     let selectedSections = analysis.features;
-    let selectedTone = options.tone || configManager.get('provider') === 'groq' ? 'professional' : 'friendly';
+    let selectedTone = options.tone || (configManager.get('provider') === 'groq' ? 'professional' : 'friendly');
+    let generateNested = options.nested || false;
     
     if (!options.yes) {
       const answers = await inquirer.prompt([
@@ -41,20 +42,28 @@ export async function generateCommand(options: { tone?: string; output?: string;
           type: 'list',
           name: 'tone',
           message: 'Select README tone:',
-          choices: ['professional', 'friendly', 'minimal', 'enterprise'],
+          choices: ['professional', 'friendly', 'minimal', 'enterprise', 'humorous', 'academic', 'concise', 'storytelling'],
           default: selectedTone
+        },
+        {
+          type: 'confirm',
+          name: 'generateNested',
+          message: 'Generate nested READMEs for sub-directories (Monorepos)?',
+          default: generateNested
         }
       ]);
       selectedSections = answers.sections;
       selectedTone = answers.tone;
+      generateNested = answers.generateNested;
     }
 
     // 3. API Call
     spinner.start('🤖 Generating README with AI...');
-    const readme = await apiService.generateReadme(analysis, {
+    const result = await apiService.generateReadme(analysis, {
       tone: selectedTone,
       sections: selectedSections,
-      shields: ['license', 'stars', 'version']
+      shields: ['license', 'stars', 'version'],
+      generateNested
     });
     spinner.succeed('README generated!');
 
@@ -74,8 +83,23 @@ export async function generateCommand(options: { tone?: string; output?: string;
       }
     }
 
-    fs.writeFileSync(outputPath, readme);
-    console.log(chalk.green(`\n✨ Successfully written to ${outputPath}!\n`));
+    fs.writeFileSync(outputPath, result.content);
+    console.log(chalk.green(`\n✨ Successfully written to ${outputPath}!`));
+
+    // Handle nested files
+    if (result.readmes && result.readmes.length > 0) {
+      console.log(chalk.blue(`\n📂 Found ${result.readmes.length} nested READMEs to save.`));
+      for (const file of result.readmes) {
+        const fullPath = path.join(process.cwd(), file.path);
+        const dir = path.dirname(fullPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        
+        // Write the nested file!
+        fs.writeFileSync(fullPath, file.content);
+        console.log(chalk.green(`  -> Written to ${file.path}`));
+      }
+    }
+    console.log();
 
   } catch (error: any) {
     spinner.fail(`Error: ${error.message}`);

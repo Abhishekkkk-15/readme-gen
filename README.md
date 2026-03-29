@@ -5,138 +5,109 @@
 [README](README.md) | [Security](SECURITY.md)
 
 
-**README.md**
+# readme-gen-workspace
 
-# Project Overview
+## Technical Overview
 
-## Vision
+This codebase is a comprehensive software application built using the React framework. The production dependencies indicate a diverse set of libraries and tools, including UI components, state management, and data fetching utilities.
 
-Our project aims to address the pressing need for a scalable and maintainable software solution that can efficiently process and analyze large datasets. By leveraging cutting-edge technologies and best practices, we envision a system that can provide real-time insights, automate decision-making processes, and drive business growth.
+### Architecture
 
-## Core Mental Model
+The project is a monorepo consisting of multiple packages and applications. The architecture is derived from the directory structure and file names.
 
-As a developer working on this project, it is essential to adopt a modular and component-based approach to software development. This means breaking down the system into smaller, independent units that can be easily maintained, updated, and scaled. Our core mental model is centered around the concept of a "data pipeline," where data flows through a series of processing stages, each with its own specific function and responsibility.
+#### Packages
 
-## Strategic Priorities
+The packages are located in the `packages` directory. Each package has its own `package.json` file and is a separate npm package.
 
-To achieve our vision and maintain a strong core mental model, we will prioritize the following strategic objectives:
+* **analyzer**: This package contains tools for analyzing code, including scanners, analyzers, and extractors.
+* **cli**: This package contains the command-line interface (CLI) for the application.
+* **api**: This package contains the API for the application.
 
-* Develop a robust and scalable data pipeline architecture that can handle large volumes of data and support real-time processing.
-* Implement a modular and component-based software development approach to ensure ease of maintenance, update, and scalability.
-* Leverage cutting-edge technologies and best practices to optimize system performance, security, and reliability.
-* Foster a culture of collaboration and knowledge-sharing among developers to ensure a deep understanding of the system and its components.
-* Continuously monitor and evaluate system performance, identifying areas for improvement and implementing changes as needed.
+#### Applications
 
-## Technical Architecture
+The applications are located in the `apps` directory. Each application has its own `package.json` file and is a separate npm package.
 
-### Overview
+* **web**: This is a web application that uses the `analyzer` package to provide code analysis features.
+* **api**: This is an API application that uses the `analyzer` package to provide code analysis features.
 
-The project's technical architecture is a multi-component, multi-layered system that consists of three primary components: **Analyzer**, **Web App**, and **CLI/ API**. The **Analyzer** is responsible for analyzing code and generating insights, which are then consumed by the **Web App**. The **Web App** is a user-facing application that provides a user interface for users to interact with the generated insights. The **CLI/ API** is a command-line interface and API that allows users to interact with the system programmatically.
+#### Shared Libraries
 
-### Component Interactions
+The shared libraries are located in the `packages` directory and are shared across multiple packages and applications.
 
-* The **Analyzer** generates insights from code and stores them in a data store.
-* The **Web App** retrieves insights from the **Analyzer** using APIs and updates the user interface accordingly.
-* The **CLI/ API** interacts with the **Analyzer** using APIs to retrieve insights and perform other operations.
+* **types**: This library contains type definitions for the application.
+* **utils**: This library contains utility functions for the application.
+* **services**: This library contains services that can be used across multiple packages and applications.
 
-### Data Flow
+## Technical Truth Map
 
-* Code is analyzed by the **Analyzer** and insights are generated.
-* Insights are stored in a data store.
-* The **Web App** retrieves insights from the **Analyzer** using APIs.
-* The **Web App** updates the user interface with the retrieved insights.
-* The **CLI/ API** interacts with the **Analyzer** using APIs to retrieve insights and perform other operations.
+The following table summarizes the technical truth map:
 
-## Installation
-
-To install the project, follow these steps:
-
-1. Clone the repository using `git clone https://github.com/your-username/your-repo-name.git`.
-2. Navigate to the project directory using `cd your-repo-name`.
-3. Install the dependencies using `npm install` or `yarn install`.
-4. Start the development server using `npm start` or `yarn start`.
+| File/Class | Description |
+| --- | --- |
+| `apps/api/src/server.ts` | Uses Express.js framework for building the server. |
+| `apps/api/src/routes/auth.routes.ts` | Implements authentication using Passport.js. |
+| `apps/api/src/routes/api.routes.ts` | Uses Express.js Router for handling API routes. |
+| `apps/api/src/controllers/generate.controller.ts` | Calls services to analyze repositories and generate readmes. |
+| `apps/api/src/services/repo.service.ts` | Uses Axios for making HTTP requests to GitHub API. |
+| `apps/api/src/services/llm.service.ts` | Uses LangChain library for language model interactions. |
+| `packages/analyzer/src/analyzers/route.extractor.ts` | Uses ts-morph library for TypeScript code analysis. |
+| `apps/api/src/samplers/code.sampler.ts` | Generates code samples from given content. |
+| `apps/cli/src/commands/config/index.ts` | Manages configuration using a config manager. |
+| `apps/api/src/config/passport.ts` | Configures Passport.js for authentication. |
+| `apps/api/src/config/db.ts` | Connects to a MongoDB database using Mongoose. |
+| `apps/cli/src/services/api.service.ts` | Generates README files using the Readme-gen analyzer. |
+| `apps/cli/src/services/analyzer.service.ts` | Analyzes project structure and code using the Readme-gen analyzer. |
+| `apps/web/src/main.tsx` | Initializes a React application using React DOM and React Router. |
+| `apps/web/src/App.tsx` | Defines the main application component with routing and layout. |
+| `apps/web/src/providers/app-providers.tsx` | Provides global context and services to the application, including authentication and theme management. |
+| `apps/web/src/pages/templates.tsx` | Displays a list of available README templates. |
+| `apps/api/src/extractors/package.extractor.ts` | Extracts package metadata from project files. |
+| `apps/api/src/extractors/config.extractor.ts` | Extracts environment variables and configuration files from project files. |
 
 ## Usage
 
-To use the project, follow these steps:
+To use the `readme-gen-workspace` application, follow these steps:
 
-1. Run the development server using `npm start` or `yarn start`.
-2. Open a web browser and navigate to `http://localhost:3000`.
-3. Interact with the user interface to analyze code and generate insights.
+1. Clone the repository using `git clone`.
+2. Install the dependencies using `npm install`.
+3. Start the application using `npm start`.
+4. Access the application at `http://localhost:3000`.
 
-## API Reference
+## Tech Stack
 
-The project exposes a RESTful API that allows users to interact with the system programmatically. The API endpoints are as follows:
+The following technologies are used in the `readme-gen-workspace` application:
 
-* `GET /analyze`: Analyze code and generate insights.
-* `GET /insights`: Retrieve insights from the data store.
-* `POST /update`: Update the user interface with new insights.
-
-## Deployment
-
-To deploy the project, follow these steps:
-
-1. Build the project using `npm run build` or `yarn build`.
-2. Deploy the built project to a production environment using a deployment tool such as Docker or Kubernetes.
-
-## Environment Variables
-
-The project uses the following environment variables:
-
-* `ANALYZER_API_KEY`: The API key for the Analyzer component.
-* `WEB_APP_API_KEY`: The API key for the Web App component.
-* `CLI_API_KEY`: The API key for the CLI/ API component.
-
-## Community & Contributing
-
-### Contributing
-
-To contribute to the project, please follow these guidelines:
-
-1. Fork the repository using `git fork https://github.com/your-username/your-repo-name.git`.
-2. Clone the forked repository using `git clone https://github.com/your-username/your-forked-repo-name.git`.
-3. Create a new branch using `git branch new-feature`.
-4. Implement the new feature and commit the changes using `git add .` and `git commit -m "New feature implementation"`.
-5. Push the changes to the remote repository using `git push origin new-feature`.
-6. Create a pull request to merge the changes into the main branch.
-
-### Code of Conduct
-
-We follow the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/2/0/code_of_conduct/).
-
-### Reporting Issues
-
-To report issues or bugs, please use the issue tracker on GitHub.
-
-### Contributing Guidelines
-
-For more information on contributing to the project, please see the [CONTRIBUTING.md](CONTRIBUTING.md) file.
-
-## License
-
-The project is licensed under the MIT License. See the LICENSE file for more information.
-
-## Architecture Diagram
-
-The following architecture diagram illustrates the components and interactions of the project:
-
-```mermaid
-graph LR
-    A[Analyzer] -->|API|> B[Web App]
-    B -->|API|> C[Data Store]
-    C -->|API|> A
-    A -->|API|> D[CLI/ API]
-    D -->|API|> A
-```
-
-## Roadmap
-
-The project has a roadmap that outlines the key features and milestones for the next quarter. The roadmap includes the following key features:
-
-* Implement a new analyzer component to improve code analysis performance.
-* Develop a new user interface component to improve user experience.
-* Integrate a new data store component to improve data storage and retrieval performance.
-
-## Conclusion
-
-The project is a scalable and maintainable software solution that can efficiently process and analyze large datasets. We welcome contributions and feedback from the community to help us achieve our vision and maintain a strong core mental model.
+* React
+* TypeScript
+* Express.js
+* Passport.js
+* Mongoose
+* Axios
+* LangChain
+* ts-morph
+* @base-ui/react
+* @dnd-kit/core
+* @dnd-kit/sortable
+* @dnd-kit/utilities
+* @fontsource-variable/geist
+* @hookform/resolvers
+* @monaco-editor/react
+* @tanstack/react-query
+* class-variance-authority
+* clsx
+* diff
+* framer-motion
+* lucide-react
+* next-themes
+* react
+* react-dom
+* react-hook-form
+* react-markdown
+* react-router-dom
+* react-syntax-highlighter
+* shadcn
+* sonner
+* tailwind-merge
+* tailwindcss-animate
+* tw-animate-css
+* zod

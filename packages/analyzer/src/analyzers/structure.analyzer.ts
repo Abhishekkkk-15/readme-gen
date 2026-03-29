@@ -19,7 +19,8 @@ export class StructureAnalyzer {
     const ig = ignore().add(gitignoreContent || '');
     ig.add(['node_modules', '.git', '.turbo', 'dist', 'build', '.next', '.vscode']);
 
-    const filteredFiles = files.filter(f => !ig.ignores(f));
+    const normalizedFiles = files.map(f => f.replace(/\\/g, '/'));
+    const filteredFiles = normalizedFiles.filter(f => !ig.ignores(f));
     const entryPoints = filteredFiles.filter(f => this.ENTRY_POINTS.includes(f.split('/').pop() || ''));
     
     // Key directories detection
@@ -43,7 +44,7 @@ export class StructureAnalyzer {
       f === 'pnpm-workspace.yaml' || 
       f === 'lerna.json' || 
       f === 'turbo.json' ||
-      (f === 'package.json' && filteredFiles.some(file => file.startsWith('packages/') || file.startsWith('apps/')))
+      (f.endsWith('package.json') && filteredFiles.some(file => file.startsWith('packages/') || file.startsWith('apps/')))
     );
 
     // Scored files
@@ -58,7 +59,7 @@ export class StructureAnalyzer {
       importantFiles: scoredFiles.slice(0, 40).map(f => f.path),
       hasDocker,
       isMonorepo,
-      tree: this.generateTreeSnippet(filteredFiles, 3)
+      tree: this.generateTreeSnippet(filteredFiles, 5) // Increased depth to 5
     };
   }
 
@@ -103,7 +104,7 @@ export class StructureAnalyzer {
         tree.push(f);
       }
     });
-    return tree.slice(0, 100);
+    return tree.slice(0, 500); // Increased count to 500
   }
 }
 
