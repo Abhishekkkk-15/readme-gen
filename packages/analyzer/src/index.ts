@@ -9,5 +9,6 @@ export * from './analyzers/schema.analyzer';
 export * from './analyzers/trace.analyzer';
 export * from './analyzers/example.analyzer';
 export * from './analyzers/devops.analyzer';
+export * from './analyzers/semantic.refiner';
 export * from './types';
 export * from './utils/scanner';

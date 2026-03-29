@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
-import { generateReadme, getProjects, analyzeRepository, improveSection, getRecommendations } from '../controllers/generate.controller';
+import { generateReadme, generateStream, getProjects, analyzeRepository, improveSection, getRecommendations } from '../controllers/generate.controller';
 
 const router = Router();
 
@@ -22,6 +22,12 @@ router.post('/recommendations', optionalAuth, getRecommendations);
 
 // Endpoint for generating a README (Optional auth, CLI safe)
 router.post('/generate', optionalAuth, generateReadme);
+
+// NEW: Endpoint for streaming a README generation (SSE)
+router.post('/generate/stream', optionalAuth, (req, res, next) => {
+  // Add generateStream to the controllers import if not already there
+  next();
+}, require('../controllers/generate.controller').generateStream);
 
 // Endpoint for improving a README section (Optional auth, CLI safe)
 router.post('/improve', optionalAuth, improveSection);

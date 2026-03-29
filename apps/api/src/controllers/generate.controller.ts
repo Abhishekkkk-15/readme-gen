@@ -133,6 +133,70 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
   }
 };
 
+export const generateStream = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features } = req.body;
+    const user = (req as any).user;
+    const apiKey = req.headers['x-api-key'] as string;
+
+    if (!user && !apiKey) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    let finalAnalysis = analysis;
+    if (repoUrl && !finalAnalysis) {
+      finalAnalysis = await repoService.analyzeRepo(repoUrl);
+    }
+
+    if (!finalAnalysis) {
+      res.status(400).json({ error: 'Analysis data is required' });
+      return;
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const stream = llmService.generateReadmeStream(
+      finalAnalysis,
+      provider === 'gemini' ? 'gemini' : 'groq',
+      {
+        sections: features,
+        tone,
+        shields,
+        additionalContext,
+        apiKey
+      }
+    );
+
+    let fullContent = '';
+    for await (const chunk of stream) {
+      fullContent += chunk;
+      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+    }
+
+    // Handle nested READMEs at the end
+    let readmes: { path: string, content: string }[] = [];
+    if (generateNested && finalAnalysis.tree) {
+      readmes = await llmService.generateNestedReadmes(
+        finalAnalysis,
+        provider === 'gemini' ? 'gemini' : 'groq',
+        { sections: features, tone, shields, additionalContext, apiKey }
+      );
+    }
+
+    res.write(`data: ${JSON.stringify({ done: true, content: fullContent, readmes })}\n\n`);
+    res.end();
+  } catch (error: any) {
+    console.error('Streaming error:', error);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
+  }
+};
+
 export const getProjects = async (req: Request, res: Response): Promise<void> => {
   try {
     const user = (req as any).user;

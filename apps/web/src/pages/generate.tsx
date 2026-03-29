@@ -416,59 +416,90 @@ export function GeneratePage() {
   async function runGenerate() {
     if (isGenerating) return
     setIsGenerating(true)
-
+    setMarkdown('') // Clear before streaming
+    setStep(3) // Transition immediately to watch the stream
+    
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
     const enabledStr = Object.keys(sections).filter((s) => sections[s])
 
-    toast.promise(
-      async () => {
-        try {
-          const res = await fetch(`${API_URL}/generate`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({
-              title: projectName || 'Your project',
-              description: description || '',
-              features: enabledStr,
-              provider: modelId.includes('gemini') ? 'gemini' : 'groq',
-              repoUrl: repoUrl || undefined,
-              analysis: analysis || undefined,
-              tone: tone,
-              shields: shields,
-              additionalContext: additionalContext,
-              generateNested: generateNested
-            }),
-          })
+    try {
+      const response = await fetch(`${API_URL}/generate/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: projectName || 'Your project',
+          description: description || '',
+          features: enabledStr,
+          provider: modelId.includes('gemini') ? 'gemini' : 'groq',
+          repoUrl: repoUrl || undefined,
+          analysis: analysis || undefined,
+          tone: tone,
+          shields: shields,
+          additionalContext: additionalContext,
+          generateNested: generateNested
+        }),
+      })
 
-          const data = await res.json()
-          if (!res.ok) throw new Error(data.error || 'Failed to generate README')
-
-          if (data.readmes && data.readmes.length > 0) {
-            setGeneratedFiles([{ path: 'README.md', content: data.content }, ...data.readmes])
-            setActiveFilePath('README.md')
-          } else {
-            setGeneratedFiles([{ path: 'README.md', content: data.content }])
-            setActiveFilePath('README.md')
-          }
-          setMarkdown(data.content)
-          setSectionOrder(parseSectionOrder(data.content))
-          setStep(3)
-          return 'README generated successfully!'
-        } catch (err: any) {
-          throw err
-        } finally {
-          setIsGenerating(false)
-        }
-      },
-      {
-        loading: 'Generating your README with AI...',
-        success: (msg) => msg,
-        error: (err) => err.message || 'Failed to generate README',
+      if (!response.ok) {
+        const errData = await response.json()
+        throw new Error(errData.error || 'Failed to start stream')
       }
-    )
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      
+      if (!reader) throw new Error('No reader available')
+
+      let accumulatedMd = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              if (data.chunk) {
+                accumulatedMd += data.chunk
+                setMarkdown(accumulatedMd)
+                // Update section order periodically or at end
+              }
+
+              if (data.done) {
+                setMarkdown(data.content)
+                setSectionOrder(parseSectionOrder(data.content))
+                if (data.readmes) {
+                  setGeneratedFiles([{ path: 'README.md', content: data.content }, ...data.readmes])
+                } else {
+                  setGeneratedFiles([{ path: 'README.md', content: data.content }])
+                }
+                toast.success('README generation complete!')
+              }
+
+              if (data.error) {
+                throw new Error(data.error)
+              }
+            } catch (e) {
+              // Ignore partial JSON or heartbeats
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Streaming error:', err)
+      toast.error(err.message || 'Error during stream generation')
+      setStep(2) // Go back on error
+    } finally {
+      setIsGenerating(false)
+    }
   }
   
   function saveWork() {

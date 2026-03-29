@@ -3,6 +3,7 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { config } from 'dotenv';
+import { SemanticRefiner } from '@readme-gen/analyzer';
 
 config();
 
@@ -118,14 +119,29 @@ RECOMMENDATION JSON:
     const targetSections = options.sections || ['Installation', 'Usage', 'Features'];
     const userContext = options.additionalContext || 'No additional context provided.';
 
-    // Step 0: Pre-Generation (Navbar & Shields)
     const navbar = this.generateNavbar(analysis);
     const shieldsMarkdown = this.generateShields(options.shields || [], analysis);
+
+    const refined = SemanticRefiner.refine(analysis);
 
     // Step 1: Technical Capabilities Mapping (Truth Pass)
     const strategyPrompt = `You are a Lead Software Architect. Map the codebase evidence to a reality-based summary.
     
-## CODEBASE EVIDENCE:
+## PROJECT REALITY (AST DATA)
+Architecture: ${refined.architecture.summary}
+Backend: ${refined.techStack.backend.join(', ') || 'None detected'}
+Frontend: ${refined.techStack.frontend.join(', ') || 'None detected'}
+Database: ${refined.techStack.database.join(', ') || 'None detected'}
+AI/ML: ${refined.techStack.ai.join(', ') || 'None detected'}
+Tooling: ${refined.techStack.tooling.join(', ') || 'None detected'}
+
+## ENRICHED FEATURES:
+${refined.features.map((f: string) => `- ${f}`).join('\n')}
+
+## LOGICAL FLOWS:
+${refined.flows.map((flow: string) => `- ${flow}`).join('\n')}
+
+## RAW METADATA:
 Framework: ${analysis.framework?.name || 'Unknown'}
 Production Dependencies: ${analysis.dependencies?.join(', ')}
 Key Directories: ${analysis.keyDirectories?.join(', ') || 'Not specified'}
@@ -219,8 +235,55 @@ FINAL CLEANED README:
     const finalContent = this.cleanLlmOutput(auditResponse);
 
     // Combine all pieces
-    const header = `# ${analysis.name}\n\n${shieldsMarkdown}\n\n${navbar}\n\n`;
+    const header = this.generateHeader(analysis, options.shields || []);
     return `${header}\n${finalContent}`;
+  }
+
+  public async *generateReadmeStream(
+    analysis: any,
+    provider: 'groq' | 'gemini' = 'groq',
+    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string } = {}
+  ): AsyncGenerator<string> {
+    const model = this.createModelInstance(provider, options.apiKey);
+    const targetTone = options.tone || 'professional';
+    const refined = SemanticRefiner.refine(analysis);
+
+    // Initial Header Stream
+    yield this.generateHeader(analysis, options.shields || []) + "\n";
+
+    // Re-use logic for truth distillation (already async, we keep it as is)
+    const technicalTruthMap = await this.distillProjectEvidence(model, analysis.evidence, targetTone);
+
+    // Construct the generation prompt (similar to generateReadme but more direct)
+    const generationPrompt = `You are a Senior Technical Writer. Generate a comprehensive README.md.
+    
+## PROJECT REALITY:
+Architecture: ${refined.architecture.summary}
+Features: ${refined.features.join(', ')}
+Flows: ${refined.flows.join(', ')}
+Technical Truth Map: ${technicalTruthMap}
+Usage: ${JSON.stringify(analysis.examples || [], null, 2)}
+ 
+## RULES:
+1. **STRICT GROUNDING**: Do not mention a single feature or dependency that isn't in the context.
+2. **ZERO FILLER**: Avoid generic marketing jargon.
+3. **NO PLACEHOLDERS**: Use "${analysis.name}".
+4. **TONE**: ${targetTone}.
+ 
+README CONTENT:
+`;
+
+    const stream = await model.pipe(new StringOutputParser()).stream(generationPrompt);
+    
+    for await (const chunk of stream) {
+      yield chunk;
+    }
+  }
+
+  private generateHeader(analysis: any, shields: string[]): string {
+    const navbar = this.generateNavbar(analysis);
+    const shieldsMarkdown = this.generateShields(shields || [], analysis);
+    return `# ${analysis.name}\n\n${shieldsMarkdown}\n\n${navbar}\n\n`;
   }
 
   public async generateNestedReadmes(
@@ -269,7 +332,7 @@ Focus on its specific role, any evident files in its directory (if you can infer
 Maintain an ${targetTone} tone.
 Additional Instructions: ${userContext}
 
-README CONTENT:
+README CONTENT (START WITH #):
 `;
 
       const draft = await this.callLlm(model, strategyPrompt);
@@ -290,6 +353,13 @@ README CONTENT:
     clean = clean.replace(/^```markdown\n/i, '').replace(/^```\n/i, '').replace(/\n```$/i, '');
     // Remove "Final Audited README" style prefixes
     clean = clean.replace(/^(Final|Audited|Cleaned)?\s*README(\.md)?:?\s*\n*/i, '');
+    
+    // TRAP: Prevent "Rules" leak
+    const rulesIndex = clean.toLowerCase().indexOf('## rules');
+    if (rulesIndex > -1) {
+      clean = clean.substring(0, rulesIndex).trim();
+    }
+
     // Ensure it starts with #
     const hashIndex = clean.indexOf('#');
     if (hashIndex > -1) {
@@ -338,17 +408,17 @@ README CONTENT:
     console.log(`Distilling technical truth from ${chunks.length} parallel batches...`);
 
     const distillationPromises = chunks.map(async (batch, index) => {
-      const batchPrompt = `Analyze these code signatures and parameters to identify purely technical facts.
-DO NOT be creative. Return a compact, bulleted "TECHNICAL FACT LIST" of what these files actually do.
+      const batchPrompt = `Analyze these code signatures and parameters. Create a TECHNICAL INVENTORY.
+DO NOT be creative. Capture EVERY function/endpoint and its parameters.
 
 ## BATCH ${index + 1} ASSETS:
 ${JSON.stringify(batch, null, 2)}
 
 ## TASK
-Return a bulleted list of 5-10 technical facts. For each fact, cite the file name.
-Example: "- File X: Implements encryption using Crypto (Key: string) -> string"
+Return a bulleted inventory of EVERYTHING in this batch.
+Be precise with parameters.
 
-TECHNICAL FACT LIST:
+TECHNICAL INVENTORY (BULLETED):
 `;
       return this.callLlm(model, batchPrompt);
     });

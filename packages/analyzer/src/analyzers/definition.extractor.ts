@@ -18,6 +18,7 @@ export class DefinitionExtractor {
 
     for (const [filePath, content] of Object.entries(files)) {
       if (!filePath.match(/\.(ts|js|tsx|jsx)$/)) continue;
+      console.log(`[Analyzer] Parsing file for definitions: ${filePath}`);
       project.createSourceFile(filePath, content);
     }
 
@@ -69,7 +70,9 @@ export class DefinitionExtractor {
 
     // Functions
     if (Node.isFunctionDeclaration(node)) {
-      definitions.push(this.formatSignature(node, 'Function'));
+      const signature = this.formatSignature(node, 'Function');
+      console.log(`  [Extractor] Found Function: ${signature}`);
+      definitions.push(signature);
     }
 
     // Variable-based Functions (Arrow or Function Expressions)
@@ -79,6 +82,7 @@ export class DefinitionExtractor {
         if (Node.isArrowFunction(initializer) || Node.isFunctionExpression(initializer)) {
           const name = node.getName();
           const params = this.formatSignature(initializer, 'Function (assigned)');
+          console.log(`  [Extractor] Found Variable Function: ${name} ${params}`);
           definitions.push(params);
         } else if (Node.isObjectLiteralExpression(initializer)) {
           // If it's a small object literal with methods, extract them

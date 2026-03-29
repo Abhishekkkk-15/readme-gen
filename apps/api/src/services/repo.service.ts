@@ -74,7 +74,12 @@ export class RepoService {
       const routes = RouteExtractor.extract(importantContents);
       const envVars = EnvExtractor.extract(importantContents);
       const astFeatures = AstFeatureDetector.detect(importantContents);
+      const sourceFiles = importantFiles.filter(f => f.match(/\.(ts|js|tsx|jsx)$/));
+      console.log(`[RepoService] Analyzing ${sourceFiles.length} source files for definitions.`);
+      
       const definitionsMap = DefinitionExtractor.extract(importantContents);
+      const totalSnippetCount = Object.values(definitionsMap).reduce((acc, val) => acc + val.length, 0);
+      console.log(`[RepoService] Extracted ${totalSnippetCount} snippets from ${Object.keys(definitionsMap).length} files.`);
 
       // 6. Evidence collection
       const evidence = {

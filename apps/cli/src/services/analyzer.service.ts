@@ -65,6 +65,10 @@ export class LocalAnalyzerService {
       ...trace.topFiles
     ])).slice(0, 60); // Slightly larger limit for trace data
 
+    console.log(`[LocalAnalyzer] Total important files to analyze: ${importantFiles.length}`);
+    const sourceFiles = importantFiles.filter(f => f.match(/\.(ts|js|tsx|jsx)$/));
+    console.log(`[LocalAnalyzer] Found ${sourceFiles.length} source files for definition extraction.`);
+
     const importantContents: Record<string, string> = { ...fileContents };
 
     for (const filePath of importantFiles) {
@@ -77,7 +81,11 @@ export class LocalAnalyzerService {
     const routes = RouteExtractor.extract(importantContents);
     const envVars = EnvExtractor.extract(importantContents);
     const astFeatures = AstFeatureDetector.detect(importantContents);
+    console.log(`[LocalAnalyzer] Extracting definitions using ts-morph...`);
     const definitionsMap = DefinitionExtractor.extract(importantContents);
+    const extractedFileCount = Object.keys(definitionsMap).length;
+    const totalSnippetCount = Object.values(definitionsMap).reduce((acc, val) => acc + val.length, 0);
+    console.log(`[LocalAnalyzer] Extracted ${totalSnippetCount} definitions from ${extractedFileCount} files.`);
     const dbSchemas = SchemaAnalyzer.analyze(importantContents);
     const examples = ExampleAnalyzer.analyze(importantContents);
     const devOps = DevOpsAnalyzer.analyze(importantContents);
