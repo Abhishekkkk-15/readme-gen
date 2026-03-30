@@ -48,7 +48,14 @@ export class PackageParser {
         const pkg = JSON.parse(allFiles[path]);
         // Normalize path for splitting
         const normalizedPath = path.replace(/\\/g, '/');
-        const prefix = normalizedPath.includes('/') ? `${normalizedPath.split('/')[0]}:` : '';
+        const parts = normalizedPath.split('/');
+        
+        // If it's a nested package (e.g., apps/api/package.json), prefix with the directory path
+        let prefix = '';
+        if (parts.length > 1) {
+          const dirParts = parts.slice(0, -1);
+          prefix = dirParts.join('/') + ':';
+        }
 
         // If no primary metadata yet, or if current one is more descriptive, pick it
         if (!primaryName || (index === 0 && pkg.name)) {
