@@ -13,6 +13,9 @@ export interface User {
   usage: {
     generationsUsed: number
     generationsLimit: number
+    tokensUsed: number
+    tokensLimit: number
+    lastResetDate: string
   }
   createdAt?: string
   updatedAt?: string

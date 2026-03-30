@@ -10,33 +10,49 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/contexts/auth-context'
-import { mockGenerations, mockModels, mockUser } from '@/data/mock'
+import { mockModels, mockUser } from '@/data/mock'
 import type { Generation } from '@/types'
 import { cn } from '@/lib/utils'
 
-async function fetchHistory(): Promise<Generation[]> {
-  await new Promise((r) => setTimeout(r, 350))
-  return mockGenerations
+async function fetchHistory(token: string | null): Promise<Generation[]> {
+  if (!token) return []
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  const res = await fetch(`${API_URL}/generate/projects`, {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.map((d: any) => ({
+    id: d._id,
+    title: d.title,
+    content: d.readmeContent,
+    createdAt: d.createdAt,
+    repoUrl: d.repoUrl
+  }))
 }
 
 export function DashboardPage() {
-  const { isAuthenticated, user, isGuest } = useAuth()
+  const { token, isAuthenticated, user, isGuest } = useAuth()
   const [prefModel, setPrefModel] = useState(mockModels[0]!.id)
 
-  const { data: history = mockGenerations } = useQuery({
-    queryKey: ['generations'],
-    queryFn: fetchHistory,
-    enabled: isAuthenticated,
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ['generations', token],
+    queryFn: () => fetchHistory(token),
+    enabled: !!token,
   })
 
   if (!isAuthenticated) {
     return <Navigate to="/auth" replace />
   }
 
-  const usageUser = user ?? mockUser
+  const usageUser = user || mockUser
   const limit = usageUser.usage.generationsLimit
   const used = usageUser.usage.generationsUsed
-  const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 8
+  const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0
+
+  const tokensUsed = usageUser.usage.tokensUsed || 0
+  const tokensLimit = usageUser.usage.tokensLimit || 5000
+  const tokensPct = tokensLimit > 0 ? Math.min(100, (tokensUsed / tokensLimit) * 100) : 0
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -62,16 +78,31 @@ export function DashboardPage() {
       <div className="mt-10 grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Usage</CardTitle>
+            <CardTitle className="text-base">Usage & Quotas</CardTitle>
             <CardDescription>
-              {limit > 0
-                ? `${used} of ${limit} generations this period`
-                : `${used} generations · unlimited quota`}
+              Your monthly usage limits for generated READMEs and LLM tokens.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <Progress value={pct} className="h-2" />
-            <p className="text-muted-foreground text-xs">Resets on the 1st of each month (mock).</p>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="font-medium text-muted-foreground">Generations</span>
+                <span className="font-bold">{used} / {limit}</span>
+              </div>
+              <Progress value={pct} className="h-1.5" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="font-medium text-muted-foreground">Token Usage</span>
+                <span className="font-bold">{tokensUsed.toLocaleString()} / {tokensLimit.toLocaleString()}</span>
+              </div>
+              <Progress value={tokensPct} className="h-1.5" />
+            </div>
+
+            <p className="text-muted-foreground text-[10px] uppercase tracking-wider font-semibold">
+              Resets on the 1st of each month.
+            </p>
           </CardContent>
         </Card>
 
@@ -113,23 +144,29 @@ export function DashboardPage() {
             <CardDescription>Last few generations in this workspace.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {history.slice(0, 4).map((g) => (
-              <div key={g.id} className="flex items-start justify-between gap-2 border-b pb-3 last:border-0">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{g.title}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {g.modelUsed} · {new Date(g.createdAt).toLocaleDateString()}
-                  </p>
+            {isLoading ? (
+               <p className="text-sm text-muted-foreground">Loading activity...</p>
+            ) : history.length > 0 ? (
+              history.slice(0, 4).map((g) => (
+                <div key={g.id} className="flex items-start justify-between gap-2 border-b pb-3 last:border-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{g.title}</p>
+                    <p className="text-muted-foreground text-xs">
+                      {new Date(g.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Link
+                    to="/generate"
+                    className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'shrink-0 gap-1')}
+                  >
+                    Open
+                    <ArrowRight className="size-3" />
+                  </Link>
                 </div>
-                <Link
-                  to="/generate"
-                  className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'shrink-0 gap-1')}
-                >
-                  Open
-                  <ArrowRight className="size-3" />
-                </Link>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No recent activity found.</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -139,29 +176,39 @@ export function DashboardPage() {
       <div>
         <h2 className="text-lg font-semibold">Recent READMEs</h2>
         <ul className="mt-4 space-y-3">
-          {history.map((g) => (
-            <li key={g.id}>
-              <Card className="border-border/80 transition-colors hover:bg-muted/30">
-                <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-medium">{g.title}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {g.repoUrl ? (
-                        <a href={g.repoUrl} className="text-primary hover:underline" target="_blank" rel="noreferrer">
-                          {g.repoUrl}
-                        </a>
-                      ) : (
-                        'No repo linked'
-                      )}
-                    </p>
-                  </div>
-                  <Link to="/generate" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                    Continue editing
-                  </Link>
-                </CardContent>
-              </Card>
-            </li>
-          ))}
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          ) : history.length > 0 ? (
+            history.map((g) => (
+              <li key={g.id}>
+                <Card className="border-border/80 transition-colors hover:bg-muted/30">
+                  <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">{g.title}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {g.repoUrl ? (
+                          <a href={g.repoUrl} className="text-primary hover:underline" target="_blank" rel="noreferrer">
+                            {g.repoUrl}
+                          </a>
+                        ) : (
+                          'No repo linked'
+                        )}
+                      </p>
+                    </div>
+                    <Link to="/generate" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                      Continue editing
+                    </Link>
+                  </CardContent>
+                </Card>
+              </li>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl border-border">
+               <History className="size-8 text-muted-foreground/50 mb-3" />
+               <p className="text-muted-foreground text-sm">You haven't generated any READMEs yet.</p>
+               <Link to="/generate" className="mt-4 text-xs font-semibold text-primary hover:underline">Start your first project →</Link>
+            </div>
+          )}
         </ul>
       </div>
     </div>

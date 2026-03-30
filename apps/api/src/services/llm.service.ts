@@ -64,13 +64,20 @@ class LLMService {
     }
   }
 
-  public async improveContent(text: string, provider: 'groq' | 'gemini' = 'groq', apiKey?: string): Promise<string> {
+  public async improveContent(text: string, provider: 'groq' | 'gemini' = 'groq', apiKey?: string): Promise<{ content: string; tokens: number }> {
     const model = this.createModelInstance(provider, apiKey);
     const improvementTemplate = `You are an expert technical writer. Improve the following markdown content:
 {text}`;
     const prompt = PromptTemplate.fromTemplate(improvementTemplate);
-    const chain = prompt.pipe(model).pipe(new StringOutputParser());
-    return await chain.invoke({ text });
+    const chain = prompt.pipe(model);
+    const response = await chain.invoke({ text }) as any;
+    
+    const content = typeof response === 'string' ? response : (response.content as string);
+    const tokens = (response as any).additional_kwargs?.usage?.total_tokens || 
+                   (response as any).usage_metadata?.total_tokens || 
+                   Math.ceil(content.length / 4);
+
+    return { content, tokens };
   }
 
   public async getRecommendations(analysis: any, provider: 'groq' | 'gemini' = 'groq', apiKey?: string): Promise<{ sections: string[]; tone: string; reason: string }> {
@@ -87,8 +94,8 @@ class LLMService {
     }
   }
 
-  private async generateProjectManifest(model: any, context: ProjectContext, summary: ProjectSummary): Promise<string> {
-    if (!context?.evidence?.files || context.evidence.files.length === 0) return "No deep context found.";
+  private async generateProjectManifest(model: any, context: ProjectContext, summary: ProjectSummary): Promise<{ content: string; tokens: number }> {
+    if (!context?.evidence?.files || context.evidence.files.length === 0) return { content: "No deep context found.", tokens: 0 };
     const evidencePrompt = `Understand the project core logic and industry domain:
 Summary: ${summary.name} - ${summary.description}
 Files: ${JSON.stringify(context.evidence.files.slice(0, 15))}
@@ -105,15 +112,19 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     analysis: ProjectAnalysis,
     provider: 'groq' | 'gemini' = 'groq',
     options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string; persona?: string } = {}
-  ): Promise<string> {
+  ): Promise<{ content: string; tokens: number }> {
     const model = this.createModelInstance(provider, options.apiKey);
     const { summary, context } = analysis;
     const refined = SemanticRefiner.refine(summary);
     const targetTone = options.tone || 'professional';
     const personaGuidance = this.getPersonaGuidance(options.persona || 'Senior Developer');
 
-    const projectManifest = await this.generateProjectManifest(model, context, summary);
-    const technicalTruthMap = await this.distillProjectEvidence(model, context.evidence, targetTone);
+    const manifestResult = await this.generateProjectManifest(model, context, summary);
+    const technicalTruthMapResult = await this.distillProjectEvidence(model, context.evidence, targetTone);
+    
+    let totalTokens = manifestResult.tokens + technicalTruthMapResult.tokens;
+    const projectManifest = manifestResult.content;
+    const technicalTruthMap = technicalTruthMapResult.content;
 
     const generationPrompt = `Generate a comprehensive README.md for ${summary.name}.
 
@@ -140,14 +151,18 @@ Is Monorepo: ${summary.isMonorepo}
 README CONTENT (START WITH #):
 `;
 
-    const draft = await this.callLlm(model, generationPrompt);
-    const finalContent = this.cleanLlmOutput(draft);
+    const generationResult = await this.callLlm(model, generationPrompt);
+    const finalContent = this.cleanLlmOutput(generationResult.content);
+    totalTokens += generationResult.tokens;
 
     const header = this.generateHeader(summary, options.shields || []);
     const diagram = this.generateArchitectureDiagram(summary);
     const envConfig = this.distillEnvVars(summary);
 
-    return `${header}\n${diagram}\n${finalContent}\n\n${envConfig}`;
+    return { 
+      content: `${header}\n${diagram}\n${finalContent}\n\n${envConfig}`, 
+      tokens: totalTokens 
+    };
   }
 
   public async *generateReadmeStream(
@@ -163,8 +178,11 @@ README CONTENT (START WITH #):
     yield this.generateHeader(summary, options.shields || []) + "\n";
     yield this.generateArchitectureDiagram(summary) + "\n";
 
-    const projectManifest = await this.generateProjectManifest(model, context, summary);
-    const technicalTruthMap = await this.distillProjectEvidence(model, context.evidence, targetTone);
+    const manifestResult = await this.generateProjectManifest(model, context, summary);
+    const technicalTruthMapResult = await this.distillProjectEvidence(model, context.evidence, targetTone);
+
+    const projectManifest = manifestResult.content;
+    const technicalTruthMap = technicalTruthMapResult.content;
 
     const streamPrompt = `Generate a README.md for ${summary.name}.
 Persona: ${options.persona || 'Senior Developer'}
@@ -208,8 +226,8 @@ TONE: ${targetTone}`;
     analysis: ProjectAnalysis,
     provider: 'groq' | 'gemini' = 'groq',
     options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string } = {}
-  ): Promise<{ path: string, content: string }[]> {
-    const readmes: { path: string, content: string }[] = [];
+  ): Promise<{ path: string; content: string; tokens: number }[]> {
+    const readmes: { path: string, content: string, tokens: number }[] = [];
     const { summary } = analysis;
     const tree = summary.tree || [];
     
@@ -246,10 +264,11 @@ TONE: ${targetTone}
 
 README CONTENT:
 `;
-      const content = await this.callLlm(model, dirPrompt);
+      const generationResult = await this.callLlm(model, dirPrompt);
       readmes.push({
         path: `${dir}/README.md`,
-        content: this.cleanLlmOutput(content)
+        content: this.cleanLlmOutput(generationResult.content),
+        tokens: generationResult.tokens
       });
     }
 
@@ -260,17 +279,23 @@ README CONTENT:
     return text.trim().replace(/^```markdown\n/i, '').replace(/^```\n/i, '').replace(/\n```$/i, '').trim();
   }
 
-  private async callLlm(model: any, prompt: string): Promise<string> {
+  private async callLlm(model: any, prompt: string): Promise<{ content: string; tokens: number }> {
     try {
-      return await model.pipe(new StringOutputParser()).invoke(prompt);
+      const response = await model.invoke(prompt);
+      const content = typeof response === 'string' ? response : response.content as string;
+      const tokens = (response as any).additional_kwargs?.usage?.total_tokens || 
+                     (response as any).usage_metadata?.total_tokens || 
+                     Math.ceil(content.length / 4);
+      
+      return { content, tokens };
     } catch (err) {
       console.error('[LLMService] Invocation failed:', err);
-      return "LLM processing failed.";
+      return { content: "LLM processing failed.", tokens: 0 };
     }
   }
 
-  private async distillProjectEvidence(model: any, evidence: any, tone: string): Promise<string> {
-    if (!evidence?.files || evidence.files.length === 0) return 'No technical assets found.';
+  private async distillProjectEvidence(model: any, evidence: any, tone: string): Promise<{ content: string; tokens: number }> {
+    if (!evidence?.files || evidence.files.length === 0) return { content: 'No technical assets found.', tokens: 0 };
     
     // Create a simplified inventory list instead of generic serialization
     const inventoryList = evidence.files.map((f: any) => {

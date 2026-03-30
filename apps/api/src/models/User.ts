@@ -13,6 +13,13 @@ export interface IUser extends Document {
     key: string;
     lastUsed: string;
   }[];
+  usage: {
+    generationsUsed: number;
+    generationsLimit: number;
+    tokensUsed: number;
+    tokensLimit: number;
+    lastResetDate: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,7 +42,10 @@ const UserSchema: Schema = new Schema(
     ],
     usage: {
       generationsUsed: { type: Number, default: 0 },
-      generationsLimit: { type: Number, default: 5 },
+      generationsLimit: { type: Number, default: 2 },
+      tokensUsed: { type: Number, default: 0 },
+      tokensLimit: { type: Number, default: 5000 },
+      lastResetDate: { type: Date, default: Date.now },
     },
   },
   { timestamps: true }

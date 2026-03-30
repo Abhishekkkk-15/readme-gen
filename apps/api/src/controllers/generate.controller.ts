@@ -2,9 +2,23 @@ import { Request, Response } from 'express';
 import { llmService } from '../services/llm.service';
 import Project from '../models/Project';
 import { repoService } from '../services/repo.service';
+import User from '../models/User';
 import { config } from 'dotenv';
 
 config();
+
+const checkAndResetUsage = async (user: any) => {
+  const now = new Date();
+  const lastReset = new Date(user.usage.lastResetDate);
+
+  if (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear()) {
+    user.usage.generationsUsed = 0;
+    user.usage.tokensUsed = 0;
+    user.usage.lastResetDate = now;
+    await user.save();
+  }
+  return user;
+};
 
 export const analyzeRepository = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -58,6 +72,20 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    if (user) {
+      await checkAndResetUsage(user);
+      if (user.plan === 'free') {
+        if (user.usage.generationsUsed >= user.usage.generationsLimit) {
+          res.status(403).json({ error: 'Monthly generation limit reached' });
+          return;
+        }
+        if (user.usage.tokensUsed >= user.usage.tokensLimit) {
+          res.status(403).json({ error: 'Monthly token limit reached' });
+          return;
+        }
+      }
+    }
+
     if (!title && !repoUrl) {
       res.status(400).json({ error: 'Title or Repository URL is required' });
       return;
@@ -78,7 +106,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const readmeContent = await llmService.generateReadme(
+    const result = await llmService.generateReadme(
       finalAnalysis,
       provider === 'gemini' ? 'gemini' : 'groq',
       {
@@ -91,7 +119,10 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       }
     );
 
-    let readmes: { path: string, content: string }[] = [];
+    const readmeContent = result.content;
+    let totalTokens = result.tokens;
+
+    let readmes: { path: string, content: string, tokens: number }[] = [];
     if (generateNested && finalAnalysis.summary.tree) {
       readmes = await llmService.generateNestedReadmes(
         finalAnalysis,
@@ -104,6 +135,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
           apiKey
         }
       );
+      totalTokens += readmes.reduce((acc, r) => acc + r.tokens, 0);
     }
 
     if (process.env.MONGODB_URI && user) {
@@ -115,6 +147,11 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
           readmeContent,
         });
         await newProject.save();
+
+        // Update usage
+        user.usage.generationsUsed += 1;
+        user.usage.tokensUsed += totalTokens;
+        await user.save();
       } catch (dbError) {
         console.error('Failed to save to database:', dbError);
       }
@@ -136,6 +173,20 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
     if (!user && !apiKey) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
+    }
+
+    if (user) {
+      await checkAndResetUsage(user);
+      if (user.plan === 'free') {
+        if (user.usage.generationsUsed >= user.usage.generationsLimit) {
+          res.status(403).json({ error: 'Monthly generation limit reached' });
+          return;
+        }
+        if (user.usage.tokensUsed >= user.usage.tokensLimit) {
+          res.status(403).json({ error: 'Monthly token limit reached' });
+          return;
+        }
+      }
     }
 
     let finalAnalysis = analysis;
@@ -172,13 +223,21 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
       res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
     }
 
-    let readmes: { path: string, content: string }[] = [];
+    let readmes: { path: string, content: string, tokens: number }[] = [];
+    let extraTokens = 0;
     if (generateNested && finalAnalysis.summary.tree) {
       readmes = await llmService.generateNestedReadmes(
         finalAnalysis,
         provider === 'gemini' ? 'gemini' : 'groq',
         { sections: features, tone, shields, additionalContext, apiKey }
       );
+      extraTokens = readmes.reduce((acc, r) => acc + r.tokens, 0);
+    }
+
+    if (user) {
+       user.usage.generationsUsed += 1;
+       user.usage.tokensUsed += Math.ceil(fullContent.length / 4) + extraTokens;
+       await user.save();
     }
 
     res.write(`data: ${JSON.stringify({ done: true, content: fullContent, readmes })}\n\n`);
@@ -214,18 +273,31 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    if (user) {
+      await checkAndResetUsage(user);
+      if (user.plan === 'free' && user.usage.tokensUsed >= user.usage.tokensLimit) {
+        res.status(403).json({ error: 'Monthly token limit reached' });
+        return;
+      }
+    }
+
     if (!text || text.trim().length === 0) {
       res.status(400).json({ error: 'Text to improve is required' });
       return;
     }
 
-    const improvedContent = await llmService.improveContent(
+    const result = await llmService.improveContent(
       text,
       provider === 'gemini' ? 'gemini' : 'groq',
       apiKey
     );
 
-    res.status(200).json({ content: improvedContent });
+    if (user) {
+      user.usage.tokensUsed += result.tokens;
+      await user.save();
+    }
+
+    res.status(200).json({ content: result.content });
   } catch (error: any) {
     console.error('Error improving content:', error);
     res.status(500).json({ error: error.message || 'Failed to improve content' });

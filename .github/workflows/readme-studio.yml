@@ -27,8 +27,8 @@ jobs:
       # - run: readme-studio generate --repo . --out README.md
       - name: Placeholder — wire CLI here
         run: |
-          echo "Add: npm install -g @readme-studio/cli"
-          echo "Then: readme-studio generate --repo . --model gpt-4o"
+          echo "Add: npm install -g @readme-gen/cli"
+          echo "Then: readme-gen generate --repo . "
 
       # Optional: open a PR instead of committing directly
       # - uses: peter-evans/create-pull-request@v6
