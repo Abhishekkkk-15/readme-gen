@@ -30,6 +30,7 @@ program
   .option('-o, --output <file>', 'Output filename', 'README.md')
   .option('-y, --yes', 'Automatically answer yes to prompt (non-interactive)')
   .option('-n, --nested', 'Generate nested READMEs for sub-directories (Monorepos)')
+  .option('-f, --files <paths...>', 'Manually specify important files for deeper analysis')
   .action(generateCommand);
 
 program

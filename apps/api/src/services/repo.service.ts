@@ -16,7 +16,7 @@ config();
 export class RepoService {  
   private GITHUB_API_URL = 'https://api.github.com/repos';
 
-  public async analyzeRepo(repoUrl: string): Promise<ProjectAnalysis> {
+  public async analyzeRepo(repoUrl: string, manualImportantFiles: string[] = []): Promise<ProjectAnalysis> {
     try {
       const { owner, repo } = this.parseRepoUrl(repoUrl);
       const repoData = await this.getRepoInfo(owner, repo);
@@ -28,7 +28,7 @@ export class RepoService {
       const nestedMetadata = allFilePaths.filter(f => 
         (f.includes('package.json') || f.includes('go.mod')) && 
         (f.startsWith('apps/') || f.startsWith('packages/'))
-      ).slice(0, 10); // Limit to top 10 nested metadata files
+      ).slice(0, 10);
       
       const metadataFiles = [...rootMetadata, ...nestedMetadata];
       const fileContents: Record<string, string> = {};
@@ -58,8 +58,14 @@ export class RepoService {
         }
       }
 
-      // Merge traced files with important files and limit to a larger set (up to 40)
-      const importantFiles = Array.from(new Set([...structure.entryPoints, ...tracedFiles, ...structure.importantFiles])).slice(0, 40);
+      // Merge traced files with important files and manual overrides, limit to a set (up to 60 for better context)
+      const importantFiles = Array.from(new Set([
+        ...structure.entryPoints, 
+        ...tracedFiles, 
+        ...structure.importantFiles,
+        ...manualImportantFiles
+      ])).filter(path => allFilePaths.includes(path)).slice(0, 60);
+
       const importantContents: Record<string, string> = { ...fileContents };
 
       for (const filePath of importantFiles) {
@@ -77,7 +83,7 @@ export class RepoService {
       const envVars = EnvExtractor.extract(importantContents);
       const astFeatures = AstFeatureDetector.detect(importantContents);
       const sourceFiles = importantFiles.filter(f => f.match(/\.(ts|js|tsx|jsx)$/));
-      console.log(`[RepoService] Analyzing ${sourceFiles.length} source files for definitions.`);
+      console.log(`[RepoService] Analyzing ${sourceFiles.length} source files for definitions (including ${manualImportantFiles.length} manual files).`);
       
       const definitionsMap = DefinitionExtractor.extract(importantContents);
       const totalSnippetCount = Object.values(definitionsMap).reduce((acc, val) => acc + val.length, 0);

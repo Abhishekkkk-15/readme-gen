@@ -8,13 +8,13 @@ config();
 
 export const analyzeRepository = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { repoUrl } = req.body;
+    const { repoUrl, manualImportantFiles = [] } = req.body;
     if (!repoUrl) {
       res.status(400).json({ error: 'Repository URL is required' });
       return;
     }
 
-    const { summary, context } = await repoService.analyzeRepo(repoUrl);
+    const { summary, context } = await repoService.analyzeRepo(repoUrl, manualImportantFiles);
     res.status(200).json({ summary, context });
   } catch (error: any) {
     console.error('Error analyzing repository:', error);
@@ -49,7 +49,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, manualImportantFiles = [] } = req.body;
     const user = (req as any).user;
 
     const apiKey = req.headers['x-api-key'] as string;
@@ -67,7 +67,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
     
     if (repoUrl && (!finalAnalysis || !finalAnalysis.summary)) {
       try {
-        finalAnalysis = await repoService.analyzeRepo(repoUrl);
+        finalAnalysis = await repoService.analyzeRepo(repoUrl, manualImportantFiles);
       } catch (err) {
         console.warn('On-the-fly analysis failed, proceeding without it:', err);
       }
@@ -129,7 +129,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
 export const generateStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona } = req.body;
+    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, manualImportantFiles = [] } = req.body;
     const user = (req as any).user;
     const apiKey = req.headers['x-api-key'] as string;
 
@@ -140,7 +140,7 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
 
     let finalAnalysis = analysis;
     if (repoUrl && (!finalAnalysis || !finalAnalysis.summary)) {
-      finalAnalysis = await repoService.analyzeRepo(repoUrl);
+      finalAnalysis = await repoService.analyzeRepo(repoUrl, manualImportantFiles);
     }
 
     if (!finalAnalysis || !finalAnalysis.summary) {

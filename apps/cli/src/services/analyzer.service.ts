@@ -32,7 +32,7 @@ export class LocalAnalyzerService {
     this.ig.add(['node_modules', '.git', 'dist', 'build', '.next', '.turbo']);
   }
 
-  public async analyze(): Promise<ProjectAnalysis> {
+  public async analyze(manualImportantFiles: string[] = []): Promise<ProjectAnalysis> {
     const allFilePaths = await this.getAllFiles();
     const fileContents: Record<string, string> = {};
 
@@ -62,10 +62,11 @@ export class LocalAnalyzerService {
     const importantFiles = Array.from(new Set([
       ...structure.entryPoints, 
       ...structure.importantFiles,
-      ...trace.topFiles
-    ])).slice(0, 60); // Slightly larger limit for trace data
+      ...trace.topFiles,
+      ...manualImportantFiles
+    ])).filter(f => fs.existsSync(path.join(this.rootPath, f))).slice(0, 70);
 
-    console.log(`[LocalAnalyzer] Total important files to analyze: ${importantFiles.length}`);
+    console.log(`[LocalAnalyzer] Total files prioritized for analysis: ${importantFiles.length} (including ${manualImportantFiles.length} manual files)`);
     const sourceFiles = importantFiles.filter(f => f.match(/\.(ts|js|tsx|jsx)$/));
     console.log(`[LocalAnalyzer] Found ${sourceFiles.length} source files for definition extraction.`);
 

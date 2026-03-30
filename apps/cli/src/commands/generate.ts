@@ -7,22 +7,43 @@ import { LocalAnalyzerService } from '../services/analyzer.service.js';
 import { apiService } from '../services/api.service.js';
 import { configManager } from '../config/config-manager.js';
 
-export async function generateCommand(options: { tone?: string; output?: string; yes?: boolean; nested?: boolean }) {
+export async function generateCommand(options: { tone?: string; output?: string; yes?: boolean; nested?: boolean; files?: string[] }) {
   if (!configManager.isConfigured()) {
     console.log(chalk.red('\n❌ CLI is not configured. Run "readmegen init" first.\n'));
     return;
   }
 
+  let manualFiles = options.files || [];
+  
+  if (!options.yes && manualFiles.length === 0) {
+    const { addFiles } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'addFiles',
+      message: 'Would you like to manually specify important files for deeper analysis?',
+      default: false
+    }]);
+
+    if (addFiles) {
+      const { filesInput } = await inquirer.prompt([{
+        type: 'input',
+        name: 'filesInput',
+        message: 'Enter file paths (comma-separated):',
+        validate: (input) => input.trim().length > 0
+      }]);
+      manualFiles = filesInput.split(',').map((f: string) => f.trim()).filter(Boolean);
+    }
+  }
+
   const spinner = ora('🔍 Scanning project...').start();
   
   try {
-    // 1. Local Analysis
+    // 1. Local Analysis (Passing manual important files)
     const analyzer = new LocalAnalyzerService();
-    const analysis = await analyzer.analyze();
+    const analysis = await analyzer.analyze(manualFiles);
     spinner.succeed('Project analyzed successfully!');
 
     // 2. Interaction
-    let selectedSections = analysis.features;
+    let selectedSections = analysis.summary.features;
     let selectedTone = options.tone || (configManager.get('provider') === 'groq' ? 'professional' : 'friendly');
     let generateNested = options.nested || false;
     
@@ -63,7 +84,8 @@ export async function generateCommand(options: { tone?: string; output?: string;
       tone: selectedTone,
       sections: selectedSections,
       shields: ['license', 'stars', 'version'],
-      generateNested
+      generateNested,
+      manualImportantFiles: manualFiles
     });
     spinner.succeed('README generated!');
 

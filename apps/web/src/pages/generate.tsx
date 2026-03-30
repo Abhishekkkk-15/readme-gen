@@ -152,6 +152,7 @@ export function GeneratePage() {
   const [isRecommending, setIsRecommending] = useState(false)
   const [additionalContext, setAdditionalContext] = useState('')
   const [persona, setPersona] = useState<string>('Senior Developer')
+  const [manualFiles, setManualFiles] = useState('')
   
   const [markdown, setMarkdown] = useState(defaultMd)
   const [sectionOrder, setSectionOrder] = useState(() => parseSectionOrder(defaultMd))
@@ -329,7 +330,10 @@ export function GeneratePage() {
               'Content-Type': 'application/json',
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
-            body: JSON.stringify({ repoUrl }),
+            body: JSON.stringify({ 
+              repoUrl,
+              manualImportantFiles: manualFiles.split(',').map(f => f.trim()).filter(Boolean)
+            }),
           })
 
           const data = await res.json()
@@ -442,7 +446,8 @@ export function GeneratePage() {
           shields: shields,
           additionalContext: additionalContext,
           generateNested: generateNested,
-          persona: persona
+          persona: persona,
+          manualImportantFiles: manualFiles.split(',').map(f => f.trim()).filter(Boolean)
         }),
       })
 
@@ -597,7 +602,20 @@ export function GeneratePage() {
                   Fetch
                 </button>
               </div>
-              <p className="text-muted-foreground text-xs">
+              
+              <div className="space-y-2 pt-2">
+                <Label htmlFor="manualFiles" className="text-xs">Important Files (Optional)</Label>
+                <Textarea 
+                  id="manualFiles"
+                  placeholder="e.g. src/core/logic.ts, apps/api/index.ts"
+                  className="text-xs resize-none min-h-[60px]"
+                  value={manualFiles}
+                  onChange={(e) => setManualFiles(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground italic">List key files (comma-separated) for deeper extraction.</p>
+              </div>
+
+              <p className="text-muted-foreground text-xs pt-1">
                 Detects Node, Python, Go from manifests; merges existing README when present.
               </p>
             </CardContent>

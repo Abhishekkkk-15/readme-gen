@@ -11,7 +11,7 @@ export class ApiService {
 
   public async generateReadme(
     analysis: ProjectAnalysis,
-    options: { tone?: string; shields?: string[]; sections?: string[]; generateNested?: boolean } = {}
+    options: { tone?: string; shields?: string[]; sections?: string[]; generateNested?: boolean; manualImportantFiles?: string[] } = {}
   ): Promise<{ content: string; readmes?: { path: string, content: string }[] }> {
     const provider = configManager.get('provider');
     const groqKey = configManager.get('groqKey');
@@ -25,14 +25,15 @@ export class ApiService {
 
     try {
       const response = await axios.post(`${this.baseUrl}/generate`, {
-        title: analysis.name,
-        description: analysis.description,
-        features: options.sections || analysis.features,
+        title: analysis.summary.name,
+        description: analysis.summary.description,
+        features: options.sections || analysis.summary.features,
         provider: provider === 'groq' ? 'groq' : 'openai', // Adjust if backend uses different naming
         analysis,
         tone: options.tone || 'professional',
         shields: options.shields || ['license', 'stars'],
-        generateNested: options.generateNested
+        generateNested: options.generateNested,
+        manualImportantFiles: options.manualImportantFiles
       }, {
         headers: {
           'x-api-key': apiKey,
