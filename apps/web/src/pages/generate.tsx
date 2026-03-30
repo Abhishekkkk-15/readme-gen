@@ -151,6 +151,7 @@ export function GeneratePage() {
   const [aiRecommendations, setAiRecommendations] = useState<{ sections: string[], tone: string, reason: string } | null>(null)
   const [isRecommending, setIsRecommending] = useState(false)
   const [additionalContext, setAdditionalContext] = useState('')
+  const [persona, setPersona] = useState<string>('Senior Developer')
   
   const [markdown, setMarkdown] = useState(defaultMd)
   const [sectionOrder, setSectionOrder] = useState(() => parseSectionOrder(defaultMd))
@@ -333,15 +334,16 @@ export function GeneratePage() {
 
           const data = await res.json()
           if (!res.ok) throw new Error(data.error || 'Failed to analyze repository')
-            console.log(data)
+          
+          // Data is now { summary: ProjectSummary, context: ProjectContext }
           setAnalysis(data)
-          setProjectName(data.name || '')
-          setDescription(data.description || '')
+          setProjectName(data.summary?.name || '')
+          setDescription(data.summary?.description || '')
           
-          // Fetch AI recommendations after analysis
-          fetchRecommendations(data)
+          // Fetch AI recommendations using only the summary
+          fetchRecommendations(data.summary)
           
-          toast.success(`Analysis complete for ${data.name}`)
+          toast.success(`Analysis complete for ${data.summary?.name}`)
           return 'Metadata loaded successfully'
         } catch (err: any) {
           throw err
@@ -367,7 +369,7 @@ export function GeneratePage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ 
-          analysis: analysisData,
+          analysis: analysisData, // This is already the summary
           provider: modelId.includes('gemini') ? 'gemini' : 'groq' 
         }),
       })
@@ -435,11 +437,12 @@ export function GeneratePage() {
           features: enabledStr,
           provider: modelId.includes('gemini') ? 'gemini' : 'groq',
           repoUrl: repoUrl || undefined,
-          analysis: analysis || undefined,
+          analysis: analysis || undefined, // Passing the full {summary, context}
           tone: tone,
           shields: shields,
           additionalContext: additionalContext,
-          generateNested: generateNested
+          generateNested: generateNested,
+          persona: persona
         }),
       })
 
@@ -724,6 +727,22 @@ export function GeneratePage() {
                       <SelectItem value="storytelling">📖 Storytelling (Narrative-driven)</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="grid gap-3 pt-2">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">README Persona</Label>
+                  <Select value={persona} onValueChange={(v) => v && setPersona(v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Senior Developer">💻 Senior Developer (Deep Technical)</SelectItem>
+                      <SelectItem value="Startup Founder">🚀 Startup Founder (Visionary & Polished)</SelectItem>
+                      <SelectItem value="Educational/Beginner">🎓 Educational (Clear & Instructive)</SelectItem>
+                      <SelectItem value="Open Source Contributor">🤝 Open Source (Community-focused)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground italic">Influences the narrative voice and technical depth.</p>
                 </div>
 
                 <div className="space-y-4 pt-2 border-t border-border/40">

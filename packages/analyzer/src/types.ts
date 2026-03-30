@@ -1,4 +1,4 @@
-export interface ProjectAnalysis {
+export interface ProjectSummary {
   name: string;
   description?: string;
   language: string;
@@ -26,10 +26,10 @@ export interface ProjectAnalysis {
   envVars?: string[];
 
   hasDocker?: boolean;
+  isMonorepo?: boolean;
 
   tree?: string[];
   keyDirectories?: string[];
-  isMonorepo?: boolean;
 
   astFeatures: {
     name: string;
@@ -66,13 +66,20 @@ export interface ProjectAnalysis {
       jobs: string[];
     };
   };
+}
 
+export interface ProjectContext {
   evidence: {
     files: {
       path: string;
       snippets: string[];
     }[];
   };
+}
+
+export interface ProjectAnalysis {
+  summary: ProjectSummary;
+  context: ProjectContext;
 }
 
 

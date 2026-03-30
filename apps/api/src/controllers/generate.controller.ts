@@ -14,8 +14,8 @@ export const analyzeRepository = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const analysis = await repoService.analyzeRepo(repoUrl);
-    res.status(200).json(analysis);
+    const { summary, context } = await repoService.analyzeRepo(repoUrl);
+    res.status(200).json({ summary, context });
   } catch (error: any) {
     console.error('Error analyzing repository:', error);
     res.status(500).json({ error: error.message || 'Failed to analyze repository' });
@@ -33,13 +33,9 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    if (!analysis) {
-      res.status(400).json({ error: 'Analysis data is required for recommendations' });
-      return;
-    }
-
+    // analysis here could be just summary or full analysis
     const recommendations = await llmService.getRecommendations(
-      analysis,
+      analysis.summary || analysis,
       provider === 'gemini' ? 'gemini' : 'groq',
       apiKey
     );
@@ -53,7 +49,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona } = req.body;
     const user = (req as any).user;
 
     const apiKey = req.headers['x-api-key'] as string;
@@ -68,9 +64,8 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
     }
 
     let finalAnalysis = analysis;
-    console.log(analysis)
-    // If repoUrl is provided but no analysis, perform analysis on the fly
-    if (repoUrl && !finalAnalysis) {
+    
+    if (repoUrl && (!finalAnalysis || !finalAnalysis.summary)) {
       try {
         finalAnalysis = await repoService.analyzeRepo(repoUrl);
       } catch (err) {
@@ -78,7 +73,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       }
     }
 
-    if (!finalAnalysis) {
+    if (!finalAnalysis || !finalAnalysis.summary) {
       res.status(400).json({ error: 'Analysis data is required for generation' });
       return;
     }
@@ -87,16 +82,17 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       finalAnalysis,
       provider === 'gemini' ? 'gemini' : 'groq',
       {
-        sections: features, // 'features' from frontend map to the array of section names
+        sections: features,
         tone,
         shields,
         additionalContext,
-        apiKey
+        apiKey,
+        persona
       }
     );
 
     let readmes: { path: string, content: string }[] = [];
-    if (generateNested && finalAnalysis.tree) {
+    if (generateNested && finalAnalysis.summary.tree) {
       readmes = await llmService.generateNestedReadmes(
         finalAnalysis,
         provider === 'gemini' ? 'gemini' : 'groq',
@@ -110,14 +106,12 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       );
     }
 
-
-    // Save the generation to MongoDB associated with the user
     if (process.env.MONGODB_URI && user) {
       try {
         const newProject = new Project({
           userId: user._id,
-          title: finalAnalysis.name || 'Untitled',
-          description: finalAnalysis.framework?.name || 'Project',
+          title: finalAnalysis.summary.name || 'Untitled',
+          description: finalAnalysis.summary.framework?.name || 'Project',
           readmeContent,
         });
         await newProject.save();
@@ -135,7 +129,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
 export const generateStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features } = req.body;
+    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona } = req.body;
     const user = (req as any).user;
     const apiKey = req.headers['x-api-key'] as string;
 
@@ -145,16 +139,15 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
     }
 
     let finalAnalysis = analysis;
-    if (repoUrl && !finalAnalysis) {
+    if (repoUrl && (!finalAnalysis || !finalAnalysis.summary)) {
       finalAnalysis = await repoService.analyzeRepo(repoUrl);
     }
 
-    if (!finalAnalysis) {
+    if (!finalAnalysis || !finalAnalysis.summary) {
       res.status(400).json({ error: 'Analysis data is required' });
       return;
     }
 
-    // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -168,7 +161,8 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
         tone,
         shields,
         additionalContext,
-        apiKey
+        apiKey,
+        persona
       }
     );
 
@@ -178,9 +172,8 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
       res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
     }
 
-    // Handle nested READMEs at the end
     let readmes: { path: string, content: string }[] = [];
-    if (generateNested && finalAnalysis.tree) {
+    if (generateNested && finalAnalysis.summary.tree) {
       readmes = await llmService.generateNestedReadmes(
         finalAnalysis,
         provider === 'gemini' ? 'gemini' : 'groq',

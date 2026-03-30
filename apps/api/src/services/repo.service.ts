@@ -7,11 +7,13 @@ import {
   PackageParser,
   AstFeatureDetector,
   DefinitionExtractor,
-  ProjectAnalysis
+  ProjectAnalysis,
+  ProjectSummary,
+  ProjectContext
 } from '@readme-gen/analyzer';
 import { config } from 'dotenv';
 config();
-export class RepoService {
+export class RepoService {  
   private GITHUB_API_URL = 'https://api.github.com/repos';
 
   public async analyzeRepo(repoUrl: string): Promise<ProjectAnalysis> {
@@ -89,8 +91,8 @@ export class RepoService {
         })).filter(f => f.snippets.length > 0)
       };
 
-      // 7. Assemble Final Analysis
-      const analysis: ProjectAnalysis = {
+      // 7. Assemble Final Analysis (Split into Summary and Context)
+      const summary: ProjectSummary = {
         name: String(packageMetadata?.name || repo),
         description: String(packageMetadata?.description || repoData?.description || ''),
         language: this.detectLanguage(allFilePaths),
@@ -113,12 +115,16 @@ export class RepoService {
         })),
         envVars,
         hasDocker: structure.hasDocker,
+        isMonorepo: structure.isMonorepo,
         tree: structure.tree,
-        keyDirectories: structure.keyDirectories,
+        keyDirectories: structure.keyDirectories
+      };
+
+      const context: ProjectContext = {
         evidence
       };
 
-      return analysis;
+      return { summary, context };
     } catch (error: any) {
       console.error('Error analyzing repo:', error);
       throw new Error(`Failed to analyze repository: ${error.message}`);
@@ -210,4 +216,3 @@ export class RepoService {
 }
 
 export const repoService = new RepoService();
-
