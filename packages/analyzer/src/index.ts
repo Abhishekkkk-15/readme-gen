@@ -12,3 +12,15 @@ export * from './analyzers/devops.analyzer';
 export * from './analyzers/semantic.refiner';
 export * from './types';
 export * from './utils/scanner';
+
+// Production-grade semantic README pipeline
+export * from './internal/analysis/chunker';
+export * from './internal/analysis/evidence';
+export * from './internal/analysis/techStack';
+export * from './internal/llm/llmClient';
+export * from './internal/pipeline/types';
+export * from './internal/pipeline/stages';
+export * from './internal/pipeline/merge';
+export * from './internal/pipeline/readme';
+export * from './internal/pipeline/runPipeline';
+export * from './internal/pipeline/quality';

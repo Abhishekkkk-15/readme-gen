@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
 import { generateCommand } from './commands/generate.js';
+import { generateReadmeSemanticCommand } from './commands/generate-readme.js';
 import { previewCommand } from './commands/preview.js';
 import { 
   configViewCommand, 
@@ -32,6 +33,20 @@ program
   .option('-n, --nested', 'Generate nested READMEs for sub-directories (Monorepos)')
   .option('-f, --files <paths...>', 'Manually specify important files for deeper analysis')
   .action(generateCommand);
+
+program
+  .command('generate-readme')
+  .description('Generate a production-grade README via the semantic JSON pipeline (no raw-code README generation)')
+  .option('-p, --provider <provider>', 'LLM provider (groq, gemini)', 'groq')
+  .option('-o, --output <file>', 'Output filename', 'README.md')
+  .option('-t, --tone <tone>', 'Tone (professional, friendly, minimal, enterprise)', 'professional')
+  .option('--hero <url>', 'Hero screenshot/banner image URL')
+  .option('--context <text>', 'Extra business context ("why it exists")')
+  .option('--timeout-ms <ms>', 'LLM timeout in ms', (v) => Number(v), 45000)
+  .option('--retries <n>', 'Retry count for transient LLM errors', (v) => Number(v), 2)
+  .option('--max-chars <n>', 'Max chars per evidence chunk (~24k ≈ 6k tokens)', (v) => Number(v), 24000)
+  .option('-f, --files <paths...>', 'Manually specify important files for deeper analysis')
+  .action(generateReadmeSemanticCommand);
 
 program
   .command('preview')

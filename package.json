@@ -1,5 +1,5 @@
 {
-  "name": "readme-gen-workspace",
+  "name": "readme-gen",
   "private": true,
   "packageManager": "pnpm@10.29.2",
   "scripts": {

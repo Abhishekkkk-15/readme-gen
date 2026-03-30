@@ -4,7 +4,8 @@
   "description": "Enterprise README Generator CLI",
   "main": "dist/index.js",
   "bin": {
-    "readmegen": "dist/index.js"
+    "readmegen": "dist/index.js",
+    "devcon": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",

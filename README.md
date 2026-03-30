@@ -193,6 +193,40 @@ GITHUB_CLIENT_SECRET=
 
 ```
 
+## Production-grade semantic README pipeline (local)
+
+This repo includes a **multi-stage README generation pipeline** that **never generates a README directly from raw code**. Instead it:
+
+- Extracts **semantic evidence** (routes, env vars, function/class signatures, real test examples)
+- Builds a **semantic understanding JSON layer** via multiple LLM calls
+- Generates `README.md` **only from the final semantic JSON**
+
+### CLI usage
+
+The semantic pipeline is exposed via the CLI command:
+
+```bash
+# Build CLI first (monorepo)
+pnpm --filter @readme-gen/cli build
+
+# Run from your target project directory
+devcon generate-readme --provider groq --output README.md
+
+# With a hero screenshot + business context (n8n-style)
+devcon generate-readme \
+  --provider gemini \
+  --hero "https://your-domain.com/screenshot.png" \
+  --context "Explain what problem this solves and who uses it." \
+  --tone professional
+```
+
+### Required keys
+
+- **Groq**: `GROQ_API_KEY`
+- **Gemini**: `GOOGLE_GENERATIVE_AI_API_KEY`
+
+You can set these as environment variables, or configure them via the CLI `init/config` flows.
+
 ### Cli (`apps/cli/.env`)
 
 ```env
