@@ -1,46 +1,76 @@
 # web
 
-# Web Application Sub-Project
-==========================
+This is a web application sub-project within the `readme-gen-workspace` monorepo. It serves as a dedicated frontend interface for users to interact with the system.
 
-## Overview
+## Installation
 
-This sub-project, `apps/web`, is a key component of the `readme-gen-workspace` parent project. Its primary role is to develop and maintain the web application layer, utilizing a robust tech stack to provide a seamless user experience.
-
-## Tech Stack
-
-The `apps/web` sub-project leverages the following technologies:
-
-- Frontend: `@base-ui/react`, `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`, `@fontsource-variable/geist`, `clsx`, `diff`, `framer-motion`, `lucide-react`, `react`, `react-dom`, `react-hook-form`, `react-markdown`, `react-router-dom`, `react-syntax-highlighter`, `shadcn`, `sonner`, `tailwind-merge`, `tailwindcss-animate`, `tw-animate-css`
-- Backend: `axios`, `chalk`, `commander`, `conf`, `dotenv`, `glob`, `inquirer`, `ora`, `express`, `mongoose`, `passport`, `passport-github2`, `passport-google-oauth20`, `passport-jwt`, `passport-local`
-
-## Directory Structure
-
-The `apps/web` directory is expected to contain the following key files and folders:
-
-- `components/`: React components for the web application
-- `containers/`: Container components for organizing application logic
-- `models/`: Mongoose models for interacting with the database
-- `routes/`: Express routes for handling API requests
-- `services/`: Service classes for encapsulating business logic
-- `utils/`: Utility functions for various tasks
-
-## Installation and Setup
-
-To set up the `apps/web` sub-project, navigate to the parent project directory and run the following commands:
+To install and run the web application, follow these steps:
 
 ```bash
+# Clone the monorepo
+git clone https://github.com/your-username/readme-gen-workspace.git
+
+# Navigate to the web application directory
 cd apps/web
-npm install
-npm run start
+
+# Install dependencies
+pnpm install
+
+# Start the development server
+pnpm run dev
+
+# Open your web browser and navigate to http://localhost:5173 to view the application
 ```
 
-This will install the required dependencies and start the development server.
+## Running the Application
+
+To run the web application in development mode, use the following command:
+
+```bash
+cd apps/web && pnpm run dev
+```
+
+To build the application for production, use the following command:
+
+```bash
+cd apps/web && pnpm run build
+```
+
+To lint the application code, use the following command:
+
+```bash
+cd apps/web && pnpm run lint
+```
+
+To preview the application in a browser, use the following command:
+
+```bash
+cd apps/web && pnpm run preview
+```
+
+## Core Dependencies
+
+The web application relies on the following core dependencies:
+
+* `@vitejs/plugin-react` for React support
+* `react` for building user interfaces
+* `react-dom` for rendering React components to the DOM
+* `typescript` for type checking and code generation
+* `eslint` for code linting and formatting
+
+## Purpose and Role
+
+The web application serves as the primary interface for users to interact with the system. It provides a user-friendly interface for users to perform various tasks, such as viewing data, creating new records, and editing existing ones. The application is built using React and TypeScript, and is designed to be scalable and maintainable.
+
+## Development and Testing
+
+The web application is developed and tested using a variety of tools and techniques, including:
+
+* `pnpm` for package management
+* `vite` for development and build processes
+* `eslint` for code linting and formatting
+* `jest` for unit testing and integration testing
 
 ## Contributing
 
-Contributions to the `apps/web` sub-project are welcome. Please follow the standard guidelines for contributing to the parent project.
-
-## License
-
-This sub-project is licensed under the MIT License. See the LICENSE file for details.
+Contributions to the web application are welcome and encouraged. If you would like to contribute to the project, please fork the repository and submit a pull request with your changes.

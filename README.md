@@ -1,113 +1,230 @@
+<p align="center">
+  <h1 align="center">readme-gen-workspace</h1>
+  <p align="center"></p>
+</p>
+
+<p align="center">
+![license](https://img.shields.io/badge/license-blue?style=flat-square) ![stars](https://img.shields.io/badge/stars-blue?style=flat-square) ![version](https://img.shields.io/badge/version-blue?style=flat-square)
+</p>
+
+<p align="center">
+[README](README.md)
+</p>
+
+
+## 🧠 Architecture Overview
+```bash
+User → Web App
+        ↓
+API (Express.js)
+        ↓
+MongoDB (Mongoose)
+```
+
+
 # readme-gen-workspace
+Automated Readme Generation for Software Projects
 
-![License](https://img.shields.io/github/license/user/readme-gen-workspace?style=flat-square) ![Stars](https://img.shields.io/github/stars/user/readme-gen-workspace?style=flat-square) ![Version](https://img.shields.io/github/v/release/user/readme-gen-workspace?style=flat-square)
+## PROJECT CONTEXT
+The `readme-gen-workspace` project is a monorepo situated in the industry domain of Software Development and Documentation, specifically addressing the problem space of Automated Readme Generation. The core logic revolves around generating high-quality, informative, and engaging README files for software projects, leveraging natural language processing (NLP) and machine learning (ML) techniques.
 
-[README](README.md) | [Security](SECURITY.md)
+## INSTALLATION
+To install the project, run the following commands:
 
+```bash
+pnpm install
+```
 
-# readme-gen-workspace
+For specific services, use `pnpm --filter`:
 
-## Technical Overview
+```bash
+# Install dependencies for the web application
+pnpm --filter apps/web install
 
-This codebase is a comprehensive software application built using the React framework. The production dependencies indicate a diverse set of libraries and tools, including UI components, state management, and data fetching utilities.
+# Install dependencies for the API server
+pnpm --filter apps/api install
+```
 
-### Architecture
+## USAGE
+To generate a README file for a project, use the following code snippet:
 
-The project is a monorepo consisting of multiple packages and applications. The architecture is derived from the directory structure and file names.
+```typescript
+// Import the generate function from the generate.controller.ts file
+import { generate } from '../packages/analyzer/src/generate.controller';
 
-#### Packages
+// Create a new project configuration
+const projectConfig = {
+  name: 'My Project',
+  description: 'A sample project',
+  language: 'JavaScript',
+  framework: 'React',
+};
 
-The packages are located in the `packages` directory. Each package has its own `package.json` file and is a separate npm package.
+// Generate the README file
+const readme = generate(projectConfig);
 
-* **analyzer**: This package contains tools for analyzing code, including scanners, analyzers, and extractors.
-* **cli**: This package contains the command-line interface (CLI) for the application.
-* **api**: This package contains the API for the application.
+// Print the generated README file
+console.log(readme);
+```
 
-#### Applications
+## FEATURES
+The `readme-gen-workspace` project features:
 
-The applications are located in the `apps` directory. Each application has its own `package.json` file and is a separate npm package.
+* Automated Readme Generation using NLP and ML techniques
+* Support for multiple programming languages and frameworks
+* Integration with large language models for advanced content generation
+* Customizable project configurations for tailored README files
+* Seamless data extraction and processing for accurate project information
 
-* **web**: This is a web application that uses the `analyzer` package to provide code analysis features.
-* **api**: This is an API application that uses the `analyzer` package to provide code analysis features.
+## ARCHITECTURE
+The project structure is organized into the following services:
 
-#### Shared Libraries
+* `packages/analyzer`: Contains the logic for analyzing project configurations and generating README files
+* `packages/api`: Contains the API server for managing project configurations and generating README files
+* `apps/web`: Contains the web application for interacting with the API and generating README files
+* `apps/cli`: Contains the command-line interface for interacting with the API and generating README files
 
-The shared libraries are located in the `packages` directory and are shared across multiple packages and applications.
+The project uses a microservices architecture, with each service responsible for a specific aspect of the project. The services communicate with each other using APIs and message queues.
 
-* **types**: This library contains type definitions for the application.
-* **utils**: This library contains utility functions for the application.
-* **services**: This library contains services that can be used across multiple packages and applications.
+## DEPENDENCIES
+The project depends on the following packages:
 
-## Technical Truth Map
+* `ignore`
+* `ts-morph`
+* `@base-ui/react`
+* `@dnd-kit/core`
+* `@dnd-kit/sortable`
+* `@dnd-kit/utilities`
+* `@fontsource-variable/geist`
+* `@hookform/resolvers`
+* `@monaco-editor/react`
+* `@tanstack/react-query`
+* `class-variance-authority`
+* `clsx`
+* `diff`
+* `framer-motion`
+* `lucide-react`
+* `next-themes`
+* `react`
+* `react-dom`
+* `react-hook-form`
+* `react-markdown`
+* `react-router-dom`
+* `react-syntax-highlighter`
+* `shadcn`
+* `sonner`
+* `tailwind-merge`
+* `tailwindcss-animate`
+* `tw-animate-css`
+* `zod`
+* `axios`
+* `chalk`
+* `commander`
+* `conf`
+* `dotenv`
+* `glob`
+* `inquirer`
+* `ora`
+* `@readme-gen/analyzer`
+* `@langchain/core`
+* `@langchain/google-genai`
+* `@langchain/groq`
+* `@types/bcryptjs`
+* `@types/cookie-parser`
+* `@types/jsonwebtoken`
+* `@types/passport`
+* `@types/passport-github2`
+* `@types/passport-google-oauth20`
+* `@types/passport-jwt`
+* `@types/passport-local`
+* `bcryptjs`
+* `cookie-parser`
+* `cors`
+* `express`
+* `jsonwebtoken`
+* `mongoose`
+* `passport`
+* `passport-github2`
+* `passport-google-oauth20`
+* `passport-jwt`
+* `passport-local`
 
-The following table summarizes the technical truth map:
+## SCRIPTS
+The project uses the following scripts:
 
-| File/Class | Description |
-| --- | --- |
-| `apps/api/src/server.ts` | Uses Express.js framework for building the server. |
-| `apps/api/src/routes/auth.routes.ts` | Implements authentication using Passport.js. |
-| `apps/api/src/routes/api.routes.ts` | Uses Express.js Router for handling API routes. |
-| `apps/api/src/controllers/generate.controller.ts` | Calls services to analyze repositories and generate readmes. |
-| `apps/api/src/services/repo.service.ts` | Uses Axios for making HTTP requests to GitHub API. |
-| `apps/api/src/services/llm.service.ts` | Uses LangChain library for language model interactions. |
-| `packages/analyzer/src/analyzers/route.extractor.ts` | Uses ts-morph library for TypeScript code analysis. |
-| `apps/api/src/samplers/code.sampler.ts` | Generates code samples from given content. |
-| `apps/cli/src/commands/config/index.ts` | Manages configuration using a config manager. |
-| `apps/api/src/config/passport.ts` | Configures Passport.js for authentication. |
-| `apps/api/src/config/db.ts` | Connects to a MongoDB database using Mongoose. |
-| `apps/cli/src/services/api.service.ts` | Generates README files using the Readme-gen analyzer. |
-| `apps/cli/src/services/analyzer.service.ts` | Analyzes project structure and code using the Readme-gen analyzer. |
-| `apps/web/src/main.tsx` | Initializes a React application using React DOM and React Router. |
-| `apps/web/src/App.tsx` | Defines the main application component with routing and layout. |
-| `apps/web/src/providers/app-providers.tsx` | Provides global context and services to the application, including authentication and theme management. |
-| `apps/web/src/pages/templates.tsx` | Displays a list of available README templates. |
-| `apps/api/src/extractors/package.extractor.ts` | Extracts package metadata from project files. |
-| `apps/api/src/extractors/config.extractor.ts` | Extracts environment variables and configuration files from project files. |
+* `dev`: Runs the development server
+* `api`: Runs the API server
+* `build`: Builds the project
+* `lint`: Runs the linter
+* `preview`: Runs the preview server
+* `packages/analyzer:build`: Builds the analyzer package
+* `packages/analyzer:dev`: Runs the analyzer package in development mode
+* `apps/web:dev`: Runs the web application in development mode
+* `apps/web:build`: Builds the web application
+* `apps/web:lint`: Runs the linter for the web application
+* `apps/web:preview`: Runs the preview server for the web application
+* `apps/cli:build`: Builds the CLI package
+* `apps/cli:start`: Starts the CLI package
+* `apps/cli:lint`: Runs the linter for the CLI package
+* `apps/api:dev`: Runs the API server in development mode
+* `apps/api:build`: Builds the API server
+* `apps/api:start`: Starts the API server
+* `apps/api:lint`: Runs the linter for the API server
 
-## Usage
+## ⚙️ Environment Configuration
 
-To use the `readme-gen-workspace` application, follow these steps:
+Each service has its own `.env` file.
 
-1. Clone the repository using `git clone`.
-2. Install the dependencies using `npm install`.
-3. Start the application using `npm start`.
-4. Access the application at `http://localhost:3000`.
+### Web (`apps/web/.env`)
 
-## Tech Stack
+```env
 
-The following technologies are used in the `readme-gen-workspace` application:
+PORT=
+FRONTEND_URL=
+JWT_SECRET=
+MONGODB_URI=
+GITHUB_TOKEN=
+GOOGLE_GENERATIVE_AI_API_KEY=
+GROQ_API_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
 
-* React
-* TypeScript
-* Express.js
-* Passport.js
-* Mongoose
-* Axios
-* LangChain
-* ts-morph
-* @base-ui/react
-* @dnd-kit/core
-* @dnd-kit/sortable
-* @dnd-kit/utilities
-* @fontsource-variable/geist
-* @hookform/resolvers
-* @monaco-editor/react
-* @tanstack/react-query
-* class-variance-authority
-* clsx
-* diff
-* framer-motion
-* lucide-react
-* next-themes
-* react
-* react-dom
-* react-hook-form
-* react-markdown
-* react-router-dom
-* react-syntax-highlighter
-* shadcn
-* sonner
-* tailwind-merge
-* tailwindcss-animate
-* tw-animate-css
-* zod
+```
+
+### Cli (`apps/cli/.env`)
+
+```env
+
+PORT=
+FRONTEND_URL=
+JWT_SECRET=
+MONGODB_URI=
+GITHUB_TOKEN=
+GOOGLE_GENERATIVE_AI_API_KEY=
+GROQ_API_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+
+```
+
+### Api (`apps/api/.env`)
+
+```env
+
+PORT=
+FRONTEND_URL=
+JWT_SECRET=
+MONGODB_URI=
+GITHUB_TOKEN=
+GOOGLE_GENERATIVE_AI_API_KEY=
+GROQ_API_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+
+```

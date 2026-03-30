@@ -1,40 +1,58 @@
 # analyzer
+================
 
-# Analyzer Sub-Project README
+## Overview
 
-## Project Overview
+The analyzer package is a critical component within the `readme-gen-workspace` monorepo, responsible for analyzing and processing data to generate high-quality README files. This package serves as a library, providing a set of reusable functions and classes that can be leveraged by other packages within the workspace.
 
-The `analyzer` sub-project is a crucial component of the `readme-gen-workspace` project, responsible for analyzing and processing data to generate high-quality README files. This sub-project leverages a range of technologies, including TypeScript, ts-morph, and various UI and utility libraries.
+## Purpose
 
-## Key Features and Functionality
+The primary purpose of the analyzer package is to extract relevant information from code repositories, such as project metadata, dependencies, and commit history. This information is then used to generate accurate and informative README files that provide valuable context to users and maintainers.
 
-The `analyzer` sub-project is designed to:
+## Installation
 
-1.  **Data Analysis**: Process and extract relevant information from project metadata, code, and other sources.
-2.  **README Generation**: Utilize the analyzed data to generate accurate and informative README files.
-3.  **Integration**: Seamlessly integrate with other components of the `readme-gen-workspace` project.
+To install the analyzer package, navigate to the root directory of the monorepo and run the following command:
+```bash
+pnpm install
+```
+Then, navigate to the analyzer package directory and run the following command to start the development server:
+```bash
+cd packages/analyzer && pnpm run dev
+```
+This will start the TypeScript compiler in watch mode, allowing you to make changes to the code and see the effects in real-time.
 
-## Directory Structure and Files
+## Core Dependencies
 
-The `analyzer` sub-project directory is expected to contain the following key files and folders:
+The analyzer package relies on the following core dependencies:
 
-*   `src/`: The main source code directory, containing TypeScript files for the analyzer logic.
-*   `index.ts`: The entry point of the sub-project, responsible for initializing and running the analyzer.
-*   `types/`: A directory containing type definitions and interfaces for the analyzer.
+* `@types/node`: Provides type definitions for Node.js
+* `typescript`: The TypeScript compiler and runtime
+* `fs-extra`: A file system utility library for Node.js
+* `path`: A utility library for working with file paths
 
-## Installation and Usage
+## Usage
 
-To install and use the `analyzer` sub-project, follow these steps:
+To use the analyzer package, import the relevant functions or classes from the package and call them as needed. For example:
+```typescript
+import { analyzeRepository } from './analyzer';
 
-1.  Navigate to the parent project directory: `cd readme-gen-workspace`
-2.  Change into the `analyzer` sub-project directory: `cd packages/analyzer`
-3.  Install the required dependencies: `npm install` (or `yarn install` if using Yarn)
-4.  Run the analyzer using the `index.ts` entry point: `npm run analyze` (or `yarn analyze` if using Yarn)
+const repository = analyzeRepository('https://github.com/user/repository');
+console.log(repository.metadata);
+```
+This code imports the `analyzeRepository` function from the analyzer package and calls it with a GitHub repository URL. The function returns an object containing metadata about the repository, which is then logged to the console.
 
-## Contributing and Maintenance
+## Contributing
 
-Contributions and maintenance of the `analyzer` sub-project are welcome. Please refer to the parent project's contribution guidelines for more information.
+Contributions to the analyzer package are welcome! If you'd like to contribute, please fork the repository and submit a pull request with your changes. Be sure to follow the standard coding conventions and testing guidelines outlined in the `CONTRIBUTING.md` file.
 
 ## License
 
-The `analyzer` sub-project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+The analyzer package is licensed under the MIT License. See the `LICENSE` file for details.
+
+## Changelog
+
+A changelog for the analyzer package can be found in the `CHANGELOG.md` file.
+
+## API Documentation
+
+API documentation for the analyzer package can be found in the `docs` directory.

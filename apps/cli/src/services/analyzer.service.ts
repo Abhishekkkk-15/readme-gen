@@ -13,7 +13,9 @@ import {
   SchemaAnalyzer,
   ExampleAnalyzer,
   DevOpsAnalyzer,
-  ProjectAnalysis
+  ProjectAnalysis,
+  ProjectSummary,
+  ProjectContext
 } from '@readme-gen/analyzer';
 
 export class LocalAnalyzerService {
@@ -100,7 +102,7 @@ export class LocalAnalyzerService {
     };
 
     // 7. Assemble Final Analysis
-    const analysis: ProjectAnalysis = {
+    const summary: ProjectSummary = {
       name: packageMetadata?.name || path.basename(this.rootPath),
       description: packageMetadata?.description || '',
       language: this.detectLanguage(allFilePaths),
@@ -128,11 +130,14 @@ export class LocalAnalyzerService {
       hasDocker: structure.hasDocker,
       tree: structure.tree,
       keyDirectories: structure.keyDirectories,
-      isMonorepo: structure.isMonorepo,
+      isMonorepo: structure.isMonorepo
+    };
+
+    const context: ProjectContext = {
       evidence
     };
 
-    return analysis;
+    return { summary, context };
   }
 
   private async getAllFiles(): Promise<string[]> {
