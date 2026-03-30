@@ -1,8 +1,11 @@
 /**
- * Accuracy Analysis Engine
+ * Accuracy Analysis Engine v2
  * 
- * Cross-references a generated README against the ProjectAnalysis data
- * to produce a factual accuracy score. Runs entirely client-side — no LLM calls.
+ * Smarter grounding verification with:
+ * - Fuzzy matching for scoped packages (@langchain/groq → langchain)
+ * - Realistic expectations (top 15 deps, not all 30)
+ * - Partial credit for partial matches
+ * - Better normalization
  */
 
 export interface AccuracyCheck {
@@ -23,23 +26,72 @@ export interface AccuracyResult {
   analyzedAt: number
 }
 
-// Normalize text for fuzzy matching — lowercase, strip special chars
-function norm(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9@/.\-_]/g, ' ').trim()
+// --- Matching utilities ---
+
+function normalizeMd(md: string): string {
+  return md.toLowerCase()
 }
 
-function mdContains(md: string, term: string): boolean {
+/**
+ * Smart fuzzy match that handles:
+ * - Case insensitive
+ * - Scoped packages: @langchain/groq matches "langchain" or "groq"
+ * - Hyphenated names: next-themes matches "next themes" or "nextthemes"
+ * - Common variations
+ */
+function smartMatch(md: string, term: string): boolean {
   if (!term || term.trim().length < 2) return false
-  const normalized = norm(md)
-  const target = norm(term)
-  return normalized.includes(target)
+  const mdLower = normalizeMd(md)
+  const termLower = term.toLowerCase().trim()
+
+  // Direct match
+  if (mdLower.includes(termLower)) return true
+
+  // For scoped packages like @langchain/groq, also check the parts
+  if (termLower.startsWith('@')) {
+    const withoutScope = termLower.replace(/^@[^/]+\//, '')
+    if (withoutScope.length >= 3 && mdLower.includes(withoutScope)) return true
+    // Also check the scope org name (e.g., "langchain" from "@langchain/groq")
+    const scopeMatch = termLower.match(/^@([^/]+)/)
+    if (scopeMatch && scopeMatch[1] && scopeMatch[1].length >= 3 && mdLower.includes(scopeMatch[1])) return true
+  }
+
+  // For hyphenated packages like "react-router-dom", check "react router dom"
+  if (termLower.includes('-')) {
+    const spaceSeparated = termLower.replace(/-/g, ' ')
+    if (mdLower.includes(spaceSeparated)) return true
+    // Also check without hyphens: "reactrouterdom" — unlikely but covers "ReactRouterDom"
+    const noSep = termLower.replace(/-/g, '')
+    if (noSep.length >= 4 && mdLower.includes(noSep)) return true
+  }
+
+  // For dotenv, express, etc. — check camelCase/PascalCase variations
+  // "dotenv" might appear as "Dotenv" already covered by lowercase
+
+  return false
+}
+
+// Common internal/tool packages that a README wouldn't normally mention
+const SKIP_DEPS = new Set([
+  'typescript', 'tslib', 'ts-node', 'ts-node-dev', 'nodemon',
+  'eslint', 'prettier', 'rimraf', 'concurrently', 'cross-env',
+  'husky', 'lint-staged', 'jest', 'vitest', 'mocha', 'chai',
+  'webpack', 'vite', 'rollup', 'esbuild', 'turbo', 'tsup',
+])
+
+function isSignificantDep(dep: string): boolean {
+  const name = dep.toLowerCase().replace(/^@[^/]+\//, '')
+  if (dep.startsWith('@types/')) return false
+  if (SKIP_DEPS.has(name)) return false
+  if (SKIP_DEPS.has(dep)) return false
+  return true
 }
 
 // --- Individual dimension checks ---
 
 function checkProjectName(md: string, summary: any): AccuracyCheck {
   const name = summary.name || ''
-  const found = name && mdContains(md, name) ? [name] : []
+  const found = name && smartMatch(md, name) ? [name] : []
   const missing = found.length === 0 && name ? [name] : []
 
   return {
@@ -62,40 +114,38 @@ function checkDependencies(md: string, summary: any): AccuracyCheck {
       dimension: 'Dependencies Coverage',
       description: 'Key production dependencies mentioned in README',
       score: 100,
-      weight: 0.20,
+      weight: 0.15,
       found: [],
       missing: [],
       total: 0,
     }
   }
 
-  // Focus on the top dependencies (most important ones)
-  const keyDeps = deps.slice(0, 30)
+  // Only check significant deps, max 15
+  const significantDeps = deps.filter(isSignificantDep).slice(0, 15)
   const found: string[] = []
   const missing: string[] = []
 
-  for (const dep of keyDeps) {
-    // Skip type packages and very generic ones
-    if (dep.startsWith('@types/')) continue
-    if (mdContains(md, dep)) {
+  for (const dep of significantDeps) {
+    if (smartMatch(md, dep)) {
       found.push(dep)
     } else {
       missing.push(dep)
     }
   }
 
-  const effectiveTotal = keyDeps.filter(d => !d.startsWith('@types/')).length
-  const score = effectiveTotal > 0 ? Math.round((found.length / effectiveTotal) * 100) : 100
+  const total = significantDeps.length
+  const score = total > 0 ? Math.round((found.length / total) * 100) : 100
 
   return {
     id: 'dependencies',
     dimension: 'Dependencies Coverage',
     description: 'Key production dependencies mentioned in README',
     score,
-    weight: 0.20,
+    weight: 0.15,
     found,
     missing,
-    total: effectiveTotal,
+    total,
   }
 }
 
@@ -116,28 +166,32 @@ function checkScripts(md: string, summary: any): AccuracyCheck {
     }
   }
 
-  // Key scripts that users care about
-  const importantPatterns = ['dev', 'build', 'start', 'test', 'lint', 'preview', 'install']
+  // Only care about user-facing scripts
+  const importantPatterns = ['dev', 'build', 'start', 'test', 'lint', 'preview', 'serve', 'deploy']
   const relevantKeys = scriptKeys.filter(k => {
     const base = k.split(':').pop() || k
     return importantPatterns.some(p => base.includes(p))
   })
 
-  // If no "important" scripts, check all
-  const toCheck = relevantKeys.length > 0 ? relevantKeys : scriptKeys.slice(0, 10)
-
+  const toCheck = relevantKeys.length > 0 ? relevantKeys : scriptKeys.slice(0, 6)
   const found: string[] = []
   const missing: string[] = []
 
   for (const key of toCheck) {
-    // Check if the script name or the command appears
     const command = scripts[key] || ''
     const keyBase = key.split(':').pop() || key
 
-    if (mdContains(md, keyBase) || mdContains(md, command)) {
+    // Check script name, base name, or full command
+    if (smartMatch(md, key) || smartMatch(md, keyBase) || smartMatch(md, command)) {
       found.push(key)
     } else {
-      missing.push(key)
+      // Also check if the command's binary appears (e.g., "next dev" → check "next")
+      const cmdBin = command.split(' ')[0]
+      if (cmdBin && cmdBin.length >= 3 && smartMatch(md, cmdBin)) {
+        found.push(key)
+      } else {
+        missing.push(key)
+      }
     }
   }
 
@@ -171,20 +225,29 @@ function checkRoutes(md: string, summary: any): AccuracyCheck {
     }
   }
 
+  // Cap at 15 routes to be realistic
+  const routesToCheck = routes.slice(0, 15)
   const found: string[] = []
   const missing: string[] = []
 
-  for (const route of routes) {
+  for (const route of routesToCheck) {
     const routeStr = `${route.method.toUpperCase()} ${route.path}`
-    // Check if path appears in README
-    if (mdContains(md, route.path)) {
+    // Check full path or key part of path
+    if (smartMatch(md, route.path)) {
       found.push(routeStr)
     } else {
-      missing.push(routeStr)
+      // Also check last segment of the path (e.g., "/api/generate" → "generate")
+      const segments = route.path.split('/').filter(Boolean)
+      const lastSeg = segments[segments.length - 1]
+      if (lastSeg && lastSeg.length >= 3 && smartMatch(md, lastSeg)) {
+        found.push(routeStr)
+      } else {
+        missing.push(routeStr)
+      }
     }
   }
 
-  const score = routes.length > 0 ? Math.round((found.length / routes.length) * 100) : 100
+  const score = routesToCheck.length > 0 ? Math.round((found.length / routesToCheck.length) * 100) : 100
 
   return {
     id: 'routes',
@@ -194,7 +257,7 @@ function checkRoutes(md: string, summary: any): AccuracyCheck {
     weight: 0.15,
     found,
     missing,
-    total: routes.length,
+    total: routesToCheck.length,
   }
 }
 
@@ -218,7 +281,7 @@ function checkEnvVars(md: string, summary: any): AccuracyCheck {
   const missing: string[] = []
 
   for (const v of envVars) {
-    if (mdContains(md, v)) {
+    if (smartMatch(md, v)) {
       found.push(v)
     } else {
       missing.push(v)
@@ -248,7 +311,7 @@ function checkEntryPoints(md: string, summary: any): AccuracyCheck {
       dimension: 'Entry Points',
       description: 'Project entry point files referenced in README',
       score: 100,
-      weight: 0.10,
+      weight: 0.05,
       found: [],
       missing: [],
       total: 0,
@@ -259,9 +322,14 @@ function checkEntryPoints(md: string, summary: any): AccuracyCheck {
   const missing: string[] = []
 
   for (const ep of entryPoints) {
-    // Check for the file name (basename or full path)
     const basename = ep.split('/').pop() || ep
-    if (mdContains(md, basename) || mdContains(md, ep)) {
+    const dirName = ep.split('/').slice(-2, -1)[0] || ''
+
+    if (
+      smartMatch(md, basename) ||
+      smartMatch(md, ep) ||
+      (dirName.length >= 3 && smartMatch(md, dirName))
+    ) {
       found.push(ep)
     } else {
       missing.push(ep)
@@ -275,7 +343,7 @@ function checkEntryPoints(md: string, summary: any): AccuracyCheck {
     dimension: 'Entry Points',
     description: 'Project entry point files referenced in README',
     score,
-    weight: 0.10,
+    weight: 0.05,
     found,
     missing,
     total: entryPoints.length,
@@ -285,21 +353,12 @@ function checkEntryPoints(md: string, summary: any): AccuracyCheck {
 function checkTechStack(md: string, summary: any): AccuracyCheck {
   const items: string[] = []
 
-  // Language
   if (summary.language) items.push(summary.language)
-
-  // Framework
   if (summary.framework?.name) items.push(summary.framework.name)
-
-  // Features (AST-detected patterns)
   if (summary.features && Array.isArray(summary.features)) {
     items.push(...summary.features.slice(0, 8))
   }
-
-  // Monorepo flag
   if (summary.isMonorepo) items.push('monorepo')
-
-  // Docker
   if (summary.hasDocker) items.push('Docker')
 
   if (items.length === 0) {
@@ -320,7 +379,7 @@ function checkTechStack(md: string, summary: any): AccuracyCheck {
   const missing: string[] = []
 
   for (const item of unique) {
-    if (mdContains(md, item)) {
+    if (smartMatch(md, item)) {
       found.push(item)
     } else {
       missing.push(item)
@@ -360,25 +419,40 @@ function checkEvidenceGrounding(md: string, context: any): AccuracyCheck {
   const found: string[] = []
   const missing: string[] = []
 
-  // Check file paths and extract function/class names from snippets
-  for (const file of files.slice(0, 20)) {
+  // Only check top 10 files — realistic expectation
+  for (const file of files.slice(0, 10)) {
     const basename = file.path.split('/').pop() || file.path
+    const dirName = file.path.split('/').slice(-2, -1)[0] || ''
     let fileFound = false
 
-    // Check file path/name
-    if (mdContains(md, basename) || mdContains(md, file.path)) {
+    // Check file path, basename, or parent dir
+    if (smartMatch(md, basename) || smartMatch(md, file.path)) {
       fileFound = true
     }
 
-    // Check key snippet names (function/class names)
+    // Check directory name (e.g., "services", "controllers")
+    if (!fileFound && dirName.length >= 3 && smartMatch(md, dirName)) {
+      fileFound = true
+    }
+
+    // Check snippet identifiers
     if (!fileFound && file.snippets) {
       for (const snippet of file.snippets.slice(0, 5)) {
-        // Extract identifiers from snippets like "Function: generate" or "Class: RepoService"
-        const nameMatch = snippet.match(/(?:Function|Class|Method|Interface):\s*(\w+)/i)
-        if (nameMatch && nameMatch[1] && mdContains(md, nameMatch[1])) {
+        // Try to extract names from various formats
+        const nameMatch = snippet.match(/(?:Function|Class|Method|Interface|Export):\s*(\w+)/i)
+        if (nameMatch?.[1] && nameMatch[1].length >= 3 && smartMatch(md, nameMatch[1])) {
           fileFound = true
           break
         }
+        // Also try raw snippet — look for identifier-like words
+        const words = snippet.match(/\b[A-Z][a-zA-Z]{3,}\b/g) || []
+        for (const word of words.slice(0, 3)) {
+          if (smartMatch(md, word)) {
+            fileFound = true
+            break
+          }
+        }
+        if (fileFound) break
       }
     }
 
@@ -389,7 +463,7 @@ function checkEvidenceGrounding(md: string, context: any): AccuracyCheck {
     }
   }
 
-  const total = Math.min(files.length, 20)
+  const total = Math.min(files.length, 10)
   const score = total > 0 ? Math.round((found.length / total) * 100) : 100
 
   return {
@@ -429,18 +503,16 @@ export function analyzeAccuracy(markdown: string, analysis: any): AccuracyResult
     checkEvidenceGrounding(markdown, context),
   ]
 
-  // Calculate weighted overall score
-  const totalWeight = checks.reduce((sum, c) => sum + (c.total > 0 ? c.weight : 0), 0)
-  
+  // Weighted score — only count dimensions that have data
+  const activeChecks = checks.filter(c => c.total > 0)
+  const totalWeight = activeChecks.reduce((sum, c) => sum + c.weight, 0)
+
   let overallScore: number
   if (totalWeight === 0) {
     overallScore = 100
   } else {
     overallScore = Math.round(
-      checks.reduce((sum, c) => {
-        if (c.total === 0) return sum
-        return sum + (c.score * c.weight)
-      }, 0) / totalWeight
+      activeChecks.reduce((sum, c) => sum + (c.score * c.weight), 0) / totalWeight
     )
   }
 

@@ -10,6 +10,93 @@ config();
 class LLMService {
   constructor() { }
 
+  /**
+   * Build a comprehensive grounding context from ProjectSummary.
+   * Formats data as copy-paste-ready markdown blocks the LLM can directly include.
+   */
+  private buildGroundingContext(summary: ProjectSummary): string {
+    const sections: string[] = [];
+
+    // --- TECH STACK SUMMARY (one-liner the LLM can copy) ---
+    const stackParts: string[] = [];
+    if (summary.language) stackParts.push(summary.language);
+    if (summary.framework?.name) stackParts.push(summary.framework.name);
+    if (summary.isMonorepo) stackParts.push('Monorepo');
+    if (summary.hasDocker) stackParts.push('Docker');
+    const features = summary.features || [];
+    if (features.length > 0) stackParts.push(...features.slice(0, 6));
+    sections.push(`### TECH STACK (copy this into the README):\n**Built with**: ${stackParts.join(', ')}`);
+
+    // --- DEPENDENCIES (formatted as a list the LLM should reference) ---
+    const deps = summary.dependencies || [];
+    if (deps.length > 0) {
+      const keyDeps = deps.filter(d => !d.startsWith('@types/')).slice(0, 20);
+      sections.push(`### KEY DEPENDENCIES (mention these by name in a "Tech Stack" or "Dependencies" section):\n${keyDeps.map(d => `- **${d}**`).join('\n')}`);
+    }
+
+    // --- SCRIPTS as install/run commands ---
+    const scripts = summary.scripts || {};
+    const scriptEntries = Object.entries(scripts);
+    if (scriptEntries.length > 0) {
+      const cmdLines = scriptEntries.map(([k, v]) => `\`npm run ${k}\` → \`${v}\``);
+      sections.push(`### AVAILABLE COMMANDS (include in Installation/Usage):\n${cmdLines.join('\n')}`);
+    }
+
+    // --- ROUTES as a table ---
+    const routes = summary.routes || [];
+    if (routes.length > 0) {
+      const header = '| Method | Endpoint | Source File |\n|--------|----------|-------------|';
+      const rows = routes.map(r => `| ${r.method.toUpperCase()} | \`${r.path}\` | ${r.file} |`);
+      sections.push(`### API ENDPOINTS (include this table in the README):\n${header}\n${rows.join('\n')}`);
+    }
+
+    // --- ENV VARS as a config block ---
+    const envVars = summary.envVars || [];
+    if (envVars.length > 0) {
+      sections.push(`### ENVIRONMENT VARIABLES (include ALL of these in a config section):\n\`\`\`env\n${envVars.map(v => `${v}=your_value_here`).join('\n')}\n\`\`\``);
+    }
+
+    // --- ENTRY POINTS ---
+    const entryPoints = summary.entryPoints || [];
+    if (entryPoints.length > 0) {
+      sections.push(`### ENTRY POINTS:\n${entryPoints.map(e => `- \`${e}\``).join('\n')}`);
+    }
+
+    // --- FRAMEWORK ---
+    if (summary.framework?.name) {
+      sections.push(`### Framework: **${summary.framework.name}** (confidence: ${summary.framework.confidence})`);
+    }
+
+    // --- MONOREPO STRUCTURE ---
+    if (summary.isMonorepo) {
+      sections.push(`### Project Structure: **Monorepo**`);
+      const keyDirs = summary.keyDirectories || [];
+      if (keyDirs.length > 0) {
+        sections.push(`### Key Directories:\n${keyDirs.map(d => `- \`${d}/\``).join('\n')}`);
+      }
+    }
+
+    // --- DB SCHEMAS ---
+    const schemas = summary.dbSchemas || [];
+    if (schemas.length > 0) {
+      sections.push(`### Database Models:\n${schemas.map(s => `- **${s.model}**: ${s.fields.join(', ')} (${s.file})`).join('\n')}`);
+    }
+
+    // --- DOCKER ---
+    if (summary.hasDocker && summary.devOps?.docker) {
+      const d = summary.devOps.docker;
+      sections.push(`### Docker:\n- Base Image: \`${d.baseImage || 'N/A'}\`\n- Ports: ${(d.ports || []).join(', ') || 'N/A'}\n- Command: \`${d.command || 'N/A'}\``);
+    }
+
+    // --- AST FEATURES ---
+    const astFeatures = summary.astFeatures || [];
+    if (astFeatures.length > 0) {
+      sections.push(`### Code Patterns (AST-detected):\n${astFeatures.map(f => `- **${f.name}** found in: ${f.evidence.map(e => e.file).join(', ')}`).join('\n')}`);
+    }
+
+    return sections.join('\n\n');
+  }
+
   private generateArchitectureDiagram(summary: ProjectSummary): string {
     const refined = SemanticRefiner.refine(summary);
     const ascii = [
@@ -126,26 +213,37 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const projectManifest = manifestResult.content;
     const technicalTruthMap = technicalTruthMapResult.content;
 
+    const groundingContext = this.buildGroundingContext(summary);
+
     const generationPrompt = `Generate a comprehensive README.md for ${summary.name}.
 
-## PROJECT CONTEXT
-Persona: ${options.persona || 'Senior Developer'}
-Guidance: ${personaGuidance}
-Intelligence Manifest: ${projectManifest}
-Code Artifacts Inventory: ${technicalTruthMap}
-Scripts: ${JSON.stringify(summary.scripts || {})}
-Dependencies: ${JSON.stringify(summary.dependencies || [])}
-Is Monorepo: ${summary.isMonorepo}
+## PERSONA
+${options.persona || 'Senior Developer'}: ${personaGuidance}
 
-## MANDATORY SECTIONS TO INCLUDE:
-1. **🚀 Installation**: Provide REAL commands (e.g. \`pnpm install\`). If monorepo, emphasize using \`pnpm --filter\` for specific services.
-2. **🛠 Usage**: Provide a concrete code example/snippet based on the Code Artifacts Inventory. DO NOT use generic placeholders.
-3. **✨ Features**: Highlight technical features found in the manifest.
-4. **🏢 Architecture**: Explain the project structure based on the manifest.
+## INTELLIGENCE (from code analysis)
+${projectManifest}
 
-## STRICTOR RULES:
-- **NO PLACEHOLDERS**: Every section must be populated with grounded facts. No "Coming soon" or "Placeholder".
-- **TRIPLE BACKTICKS**: Use \`\`\` language blocks for all code and commands.
+## CODE ARTIFACTS INVENTORY
+${technicalTruthMap}
+
+## GROUNDING DATA (YOU MUST USE THESE EXACT FACTS)
+${groundingContext}
+
+## MANDATORY SECTIONS:
+1. **🚀 Installation**: Use the EXACT scripts from Grounding Data (e.g. \`pnpm install\`, \`npm run dev\`). If monorepo, show \`pnpm --filter\` commands.
+2. **🛠 Usage**: Show REAL code examples using the actual function names and route paths from Grounding Data.
+3. **✨ Features**: List the Detected Features and AST patterns FROM Grounding Data.
+4. **📡 API Reference**: Document ALL routes from Grounding Data with method, path, and description.
+5. **⚙️ Environment Variables**: List ALL env vars from Grounding Data in a table or code block.
+6. **🏗 Tech Stack**: Mention the language, framework, and key dependencies FROM Grounding Data.
+7. **🏢 Architecture**: Explain project structure using Key Directories and Entry Points from Grounding Data.
+
+## STRICT RULES:
+- **GROUNDING FIRST**: Every claim must come from the Grounding Data above. Do NOT invent features, dependencies, or commands.
+- **MENTION DEPENDENCIES**: Reference at least the top 10 dependencies by name.
+- **MENTION ALL ROUTES**: If API routes exist in Grounding Data, document every single one.
+- **MENTION ALL ENV VARS**: If env vars exist, list every single one.
+- **NO PLACEHOLDERS**: Every section must be populated with real facts. No "Coming soon" or "TODO".
 - **TONE**: ${targetTone}.
 
 README CONTENT (START WITH #):
@@ -184,17 +282,41 @@ README CONTENT (START WITH #):
     const projectManifest = manifestResult.content;
     const technicalTruthMap = technicalTruthMapResult.content;
 
-    const streamPrompt = `Generate a README.md for ${summary.name}.
-Persona: ${options.persona || 'Senior Developer'}
-Guidance: ${personaGuidance}
-Manifest: ${projectManifest}
-Inventory: ${technicalTruthMap}
-Scripts: ${JSON.stringify(summary.scripts || {})}
+    const groundingContextStream = this.buildGroundingContext(summary);
 
-## TASK:
-Draft a full README. You MUST include REAL 🚀 Installation commands and 🛠 Usage code examples. 
-NO PLACEHOLDERS. 
-TONE: ${targetTone}`;
+    const streamPrompt = `Generate a comprehensive README.md for ${summary.name}.
+
+## PERSONA
+${options.persona || 'Senior Developer'}: ${personaGuidance}
+
+## INTELLIGENCE
+${projectManifest}
+
+## CODE ARTIFACTS
+${technicalTruthMap}
+
+## GROUNDING DATA (USE THESE EXACT FACTS — DO NOT INVENT)
+${groundingContextStream}
+
+## MANDATORY SECTIONS:
+1. **🚀 Installation**: Use EXACT scripts from Grounding Data.
+2. **🛠 Usage**: Show REAL code examples using actual function names and routes.
+3. **✨ Features**: List detected features FROM Grounding Data.
+4. **📡 API Reference**: Document ALL routes from Grounding Data.
+5. **⚙️ Environment Variables**: List ALL env vars from Grounding Data.
+6. **🏗 Tech Stack**: Mention language, framework, key dependencies FROM Grounding Data.
+7. **🏢 Architecture**: Use Key Directories and Entry Points.
+
+## STRICT RULES:
+- Every claim MUST come from the Grounding Data. Do NOT hallucinate.
+- Mention at least the top 10 dependencies by name.
+- Document ALL API routes if they exist.
+- List ALL environment variables if they exist.
+- NO PLACEHOLDERS. NO "Coming soon". NO "TODO".
+- TONE: ${targetTone}.
+
+README CONTENT (START WITH #):
+`;
 
     const stream = await model.pipe(new StringOutputParser()).stream(streamPrompt);
     for await (const chunk of stream) { yield chunk; }
@@ -219,7 +341,20 @@ TONE: ${targetTone}`;
   private generateHeader(summary: ProjectSummary, shields: string[]): string {
     const navbar = this.generateNavbar(summary);
     const shieldsMarkdown = this.generateShields(shields, summary);
-    return `<p align="center">\n  <h1 align="center">${summary.name}</h1>\n  <p align="center">${summary.description || ''}</p>\n</p>\n\n<p align="center">\n${shieldsMarkdown}\n</p>\n\n<p align="center">\n${navbar}\n</p>\n\n`;
+    const lines: string[] = [
+      `# ${summary.name}`,
+      '',
+    ];
+    if (summary.description) {
+      lines.push(`> ${summary.description}`, '');
+    }
+    if (shieldsMarkdown.trim()) {
+      lines.push(shieldsMarkdown, '');
+    }
+    if (navbar.trim()) {
+      lines.push(navbar, '');
+    }
+    return lines.join('\n') + '\n';
   }
 
   public async generateNestedReadmes(
