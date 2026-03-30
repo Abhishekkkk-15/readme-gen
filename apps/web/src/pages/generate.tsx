@@ -26,6 +26,7 @@ import { MarkdownDiff } from '@/components/markdown-diff'
 import { MarkdownPreview } from '@/components/markdown-preview'
 import { ModelSelector } from '@/components/model-selector'
 import { QualityInsights } from '@/components/quality-insights'
+import { AccuracyInsights } from '@/components/accuracy-insights'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -992,14 +993,20 @@ export function GeneratePage() {
             </TabsContent>
 
             <TabsContent value="insights" className="mt-0">
-              <div className="grid lg:grid-cols-2 gap-4 items-start">
-                <QualityInsights 
-                  markdown={markdown}
-                  onFix={(fixed) => {
-                    setMarkdown(fixed)
-                    toast.success("Applied fix")
-                  }} 
-                />
+              <div className="space-y-4">
+                <div className="grid lg:grid-cols-2 gap-4 items-start">
+                  <QualityInsights 
+                    markdown={markdown}
+                    onFix={(fixed) => {
+                      setMarkdown(fixed)
+                      toast.success("Applied fix")
+                    }} 
+                  />
+                  <AccuracyInsights 
+                    markdown={markdown}
+                    analysis={analysis}
+                  />
+                </div>
                 
                 <Card>
                   <CardHeader className="pb-2">
