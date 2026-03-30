@@ -50,7 +50,7 @@ import { consumeDraftRestore } from '@/lib/snapshot-storage'
 import { useReadmeHistory } from '@/hooks/use-readme-history'
 import { cn } from '@/lib/utils'
 
-const sectionOptions = ['Installation', 'Usage', 'API', 'Contributing', 'License', 'Badges'] as const
+const sectionOptions = ['Architecture', 'Installation', 'Usage', 'API', 'Testing', 'Deployment', 'Contributing', 'License', 'Badges'] as const
 
 const defaultMd = `# readme-gen
 
@@ -154,6 +154,7 @@ export function GeneratePage() {
   const [additionalContext, setAdditionalContext] = useState('')
   const [persona, setPersona] = useState<string>('Senior Developer')
   const [manualFiles, setManualFiles] = useState('')
+  const [heroImageUrl, setHeroImageUrl] = useState('')
   
   const [markdown, setMarkdown] = useState(defaultMd)
   const [sectionOrder, setSectionOrder] = useState(() => parseSectionOrder(defaultMd))
@@ -448,6 +449,7 @@ export function GeneratePage() {
           additionalContext: additionalContext,
           generateNested: generateNested,
           persona: persona,
+          heroImageUrl: heroImageUrl || undefined,
           manualImportantFiles: manualFiles.split(',').map(f => f.trim()).filter(Boolean)
         }),
       })
@@ -802,6 +804,18 @@ export function GeneratePage() {
                     onChange={(e) => setAdditionalContext(e.target.value)}
                   />
                   <p className="text-[10px] text-muted-foreground italic">AI will prioritize these instructions during generation.</p>
+                </div>
+
+                <div className="space-y-3 pt-2 border-t border-border/40">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hero screenshot (optional)</Label>
+                  <Input
+                    placeholder="https://.../screenshot.png"
+                    value={heroImageUrl}
+                    onChange={(e) => setHeroImageUrl(e.target.value)}
+                  />
+                  <p className="text-[10px] text-muted-foreground italic">
+                    If provided, the generated README will embed this image near the top (n8n/OpenClaw style).
+                  </p>
                 </div>
               </CardContent>
             </Card>

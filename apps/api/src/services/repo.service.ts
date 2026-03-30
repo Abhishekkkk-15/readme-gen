@@ -7,6 +7,7 @@ import {
   PackageParser,
   AstFeatureDetector,
   DefinitionExtractor,
+  ExampleAnalyzer,
   ProjectAnalysis,
   ProjectSummary,
   ProjectContext,
@@ -141,6 +142,9 @@ export class RepoService {
           .filter((f) => f.snippets.length > 0),
       };
 
+      // 6.5. Real usage examples from tests (when present)
+      const examples = ExampleAnalyzer.analyze(importantContents);
+
       // 7. Assemble Final Analysis (Split into Summary and Context)
       const summary: ProjectSummary = {
         name: String(packageMetadata?.name || repo),
@@ -169,6 +173,7 @@ export class RepoService {
           snippet: r.snippet,
         })),
         envVars,
+        examples,
         hasDocker: structure.hasDocker,
         isMonorepo: structure.isMonorepo,
         tree: structure.tree,

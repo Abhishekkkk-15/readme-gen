@@ -63,7 +63,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, manualImportantFiles = [] } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, heroImageUrl, manualImportantFiles = [] } = req.body;
     const user = (req as any).user;
 
     const apiKey = req.headers['x-api-key'] as string;
@@ -115,7 +115,8 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
         shields,
         additionalContext,
         apiKey,
-        persona
+        persona,
+        heroImageUrl,
       }
     );
 
@@ -166,7 +167,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
 export const generateStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, manualImportantFiles = [] } = req.body;
+    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [] } = req.body;
     const user = (req as any).user;
     const apiKey = req.headers['x-api-key'] as string;
 
@@ -213,7 +214,8 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
         shields,
         additionalContext,
         apiKey,
-        persona
+        persona,
+        heroImageUrl,
       }
     );
 

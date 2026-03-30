@@ -50,6 +50,15 @@ class LLMService {
       sections.push(`### API ENDPOINTS (include this table in the README):\n${header}\n${rows.join('\n')}`);
     }
 
+    // --- ROUTE SNIPPETS (verbatim evidence for examples) ---
+    const routeSnippets = (summary.routes || []).filter(r => Boolean(r.snippet)).slice(0, 8);
+    if (routeSnippets.length > 0) {
+      sections.push(
+        `### ROUTE HANDLER SNIPPETS (use these verbatim for API descriptions/examples):\n` +
+        routeSnippets.map(r => `- \`${r.method.toUpperCase()} ${r.path}\` (${r.file})\n\`\`\`ts\n${String(r.snippet).trim().slice(0, 800)}\n\`\`\``).join('\n')
+      );
+    }
+
     // --- ENV VARS as a config block ---
     const envVars = summary.envVars || [];
     if (envVars.length > 0) {
@@ -94,22 +103,76 @@ class LLMService {
       sections.push(`### Code Patterns (AST-detected):\n${astFeatures.map(f => `- **${f.name}** found in: ${f.evidence.map(e => e.file).join(', ')}`).join('\n')}`);
     }
 
+    // --- REAL EXAMPLES (from tests) ---
+    const examples = summary.examples || [];
+    if (examples.length > 0) {
+      const rendered = examples.slice(0, 6).map(ex => {
+        const code = (ex.code || '').trim().slice(0, 1200);
+        return `- **${ex.description}** (${ex.file})\n\`\`\`ts\n${code}\n\`\`\``;
+      }).join('\n');
+      sections.push(`### REAL USAGE EXAMPLES (prefer these in Usage/Quick Start):\n${rendered}`);
+    }
+
     return sections.join('\n\n');
   }
 
-  private generateArchitectureDiagram(summary: ProjectSummary): string {
-    const refined = SemanticRefiner.refine(summary);
-    const ascii = [
-      "```bash",
-      "User → Web App",
-      "        ↓",
-      `API (${refined.techStack.backend[0] || 'Node.js'})`,
-      "        ↓",
-      `${refined.techStack.database[0] || 'Database'}`,
-      summary.dependencies?.includes('redis') ? "        ↓\nRedis → Workers" : "",
-      "```"
-    ].filter(Boolean).join('\n');
-    return `## 🧠 Architecture Overview\n${ascii}\n\n`;
+  /**
+   * Evidence index for forcing concrete examples (functions/classes/interfaces).
+   * This comes from ProjectContext.evidence (DefinitionExtractor) and is stronger than summaries.
+   */
+  private buildEvidenceIndex(context: ProjectContext): string {
+    const files = context?.evidence?.files || [];
+    if (files.length === 0) return 'No evidence index available.';
+
+    const topFiles = files.slice(0, 20);
+    const lines: string[] = ['### CODE SURFACE (verbatim signatures by file)'];
+    for (const f of topFiles) {
+      const snippets = (f.snippets || []).slice(0, 30);
+      if (snippets.length === 0) continue;
+      lines.push(`- **${f.path}**`);
+      lines.push('```text');
+      lines.push(...snippets.map(s => String(s).slice(0, 400)));
+      lines.push('```');
+    }
+    return lines.join('\n');
+  }
+
+  /**
+   * Dynamically build instructions based on requested sections.
+   */
+  private buildSectionPrompt(sections: string[] = []): string {
+    if (sections.length === 0) {
+      return `## MANDATORY SECTIONS:\nInclude standard README sections based on the Grounding Data.`;
+    }
+
+    const instructions: string[] = ["## MANDATORY SECTIONS TO INCLUDE (AND NO OTHERS):"];
+    
+    if (sections.includes('Architecture')) {
+      instructions.push(`- **Architecture**: Create an elegant \`mermaid\` state or flowchart diagram explaining the domain flow and structure.`);
+    }
+    if (sections.includes('Installation')) {
+      instructions.push(`- **Installation**: Provide EXACT setup scripts (e.g. \`npm install\`). If monorepo, emphasize using \`--filter\` or workspace commands.`);
+    }
+    if (sections.includes('Usage')) {
+      instructions.push(`- **Usage**: Provide at least 2 concrete examples using real endpoints/routes OR real exported functions/classes from the Code Surface. Prefer examples from "REAL USAGE EXAMPLES" when present.`);
+    }
+    if (sections.includes('API')) {
+      instructions.push(`- **API Reference**: Document ALL routes from Grounding Data with method, path, and description.`);
+    }
+    if (sections.includes('Testing')) {
+      instructions.push(`- **Testing**: Provide commands from Grounding Data on how to run the test suite and linters.`);
+    }
+    if (sections.includes('Deployment')) {
+      instructions.push(`- **Deployment**: Provide build commands or Docker deployment instructions from Grounding Data.`);
+    }
+    if (sections.includes('Contributing')) {
+      instructions.push(`- **Contributing**: Briefly outline typical contribution guidelines (PR process, code standards).`);
+    }
+    if (sections.includes('License')) {
+      instructions.push(`- **License**: Insert a standard open-source license placeholder (e.g. MIT).`);
+    }
+
+    return instructions.join('\n');
   }
 
   private distillEnvVars(summary: ProjectSummary): string {
@@ -198,7 +261,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
   public async generateReadme(
     analysis: ProjectAnalysis,
     provider: 'groq' | 'gemini' = 'groq',
-    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string; persona?: string } = {}
+    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string; persona?: string; heroImageUrl?: string } = {}
   ): Promise<{ content: string; tokens: number }> {
     const model = this.createModelInstance(provider, options.apiKey);
     const { summary, context } = analysis;
@@ -214,8 +277,10 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const technicalTruthMap = technicalTruthMapResult.content;
 
     const groundingContext = this.buildGroundingContext(summary);
+    const evidenceIndex = this.buildEvidenceIndex(context);
+    const sectionInstructions = this.buildSectionPrompt(options.sections);
 
-    const generationPrompt = `Generate a comprehensive README.md for ${summary.name}.
+    const generationPrompt = `Generate a comprehensive, enterprise-grade README.md for ${summary.name}.
 
 ## PERSONA
 ${options.persona || 'Senior Developer'}: ${personaGuidance}
@@ -229,21 +294,22 @@ ${technicalTruthMap}
 ## GROUNDING DATA (YOU MUST USE THESE EXACT FACTS)
 ${groundingContext}
 
-## MANDATORY SECTIONS:
-1. **🚀 Installation**: Use the EXACT scripts from Grounding Data (e.g. \`pnpm install\`, \`npm run dev\`). If monorepo, show \`pnpm --filter\` commands.
-2. **🛠 Usage**: Show REAL code examples using the actual function names and route paths from Grounding Data.
-3. **✨ Features**: List the Detected Features and AST patterns FROM Grounding Data.
-4. **📡 API Reference**: Document ALL routes from Grounding Data with method, path, and description.
-5. **⚙️ Environment Variables**: List ALL env vars from Grounding Data in a table or code block.
-6. **🏗 Tech Stack**: Mention the language, framework, and key dependencies FROM Grounding Data.
-7. **🏢 Architecture**: Explain project structure using Key Directories and Entry Points from Grounding Data.
+## CODE SURFACE (YOU MUST QUOTE THESE VERBATIM WHEN WRITING EXAMPLES)
+${evidenceIndex}
+
+${sectionInstructions}
+
+## ADDITIONAL CONTEXT (CRITICAL BUSINESS LOGIC / WHY IT EXISTS)
+${options.additionalContext || 'No additional context provided.'}
 
 ## STRICT RULES:
-- **GROUNDING FIRST**: Every claim must come from the Grounding Data above. Do NOT invent features, dependencies, or commands.
-- **MENTION DEPENDENCIES**: Reference at least the top 10 dependencies by name.
-- **MENTION ALL ROUTES**: If API routes exist in Grounding Data, document every single one.
-- **MENTION ALL ENV VARS**: If env vars exist, list every single one.
-- **NO PLACEHOLDERS**: Every section must be populated with real facts. No "Coming soon" or "TODO".
+- **GROUNDING FIRST**: Every claim must come from the Grounding Data or Additional Context above. Do NOT invent features, dependencies, or commands.
+- **OMIT UNSELECTED SECTIONS**: If a section is not listed in MANDATORY SECTIONS, do NOT generate it.
+- **MENTION DEPENDENCIES**: Reference key dependencies by name when discussing the tech stack.
+- **MENTION ALL ROUTES/ENV VARS**: If API/Env sections are requested, list them all.
+- **REAL EXAMPLES ONLY**: For Usage/Quick Start/API examples, you MUST use real endpoint paths (e.g. \`/api/...\`) and real function/class names from CODE SURFACE. If you can’t ground an example, omit it rather than inventing it.
+- **INCORPORATE CONTEXT**: Integrate the 'ADDITIONAL CONTEXT' into the Overview and Architecture sections to explain the "Why" and the business value.
+- **NO PLACEHOLDERS**: Every generated section must be populated with real facts. No "Coming soon" or "TODO".
 - **TONE**: ${targetTone}.
 
 README CONTENT (START WITH #):
@@ -253,12 +319,11 @@ README CONTENT (START WITH #):
     const finalContent = this.cleanLlmOutput(generationResult.content);
     totalTokens += generationResult.tokens;
 
-    const header = this.generateHeader(summary, options.shields || []);
-    const diagram = this.generateArchitectureDiagram(summary);
+    const header = this.generateHeader(summary, options.shields || [], options.heroImageUrl);
     const envConfig = this.distillEnvVars(summary);
 
     return { 
-      content: `${header}\n${diagram}\n${finalContent}\n\n${envConfig}`, 
+      content: `${header}\n${finalContent}\n\n${envConfig}`, 
       tokens: totalTokens 
     };
   }
@@ -266,15 +331,14 @@ README CONTENT (START WITH #):
   public async *generateReadmeStream(
     analysis: ProjectAnalysis,
     provider: 'groq' | 'gemini' = 'groq',
-    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string; persona?: string } = {}
+    options: { sections?: string[]; tone?: string; shields?: string[]; additionalContext?: string; apiKey?: string; persona?: string; heroImageUrl?: string } = {}
   ): AsyncGenerator<string> {
     const model = this.createModelInstance(provider, options.apiKey);
     const { summary, context } = analysis;
     const targetTone = options.tone || 'professional';
     const personaGuidance = this.getPersonaGuidance(options.persona || 'Senior Developer');
 
-    yield this.generateHeader(summary, options.shields || []) + "\n";
-    yield this.generateArchitectureDiagram(summary) + "\n";
+    yield this.generateHeader(summary, options.shields || [], options.heroImageUrl) + "\n";
 
     const manifestResult = await this.generateProjectManifest(model, context, summary);
     const technicalTruthMapResult = await this.distillProjectEvidence(model, context.evidence, targetTone);
@@ -283,8 +347,10 @@ README CONTENT (START WITH #):
     const technicalTruthMap = technicalTruthMapResult.content;
 
     const groundingContextStream = this.buildGroundingContext(summary);
+    const evidenceIndex = this.buildEvidenceIndex(context);
+    const sectionInstructionsStream = this.buildSectionPrompt(options.sections);
 
-    const streamPrompt = `Generate a comprehensive README.md for ${summary.name}.
+    const streamPrompt = `Generate a comprehensive, enterprise-grade README.md for ${summary.name}.
 
 ## PERSONA
 ${options.persona || 'Senior Developer'}: ${personaGuidance}
@@ -298,28 +364,34 @@ ${technicalTruthMap}
 ## GROUNDING DATA (USE THESE EXACT FACTS — DO NOT INVENT)
 ${groundingContextStream}
 
-## MANDATORY SECTIONS:
-1. **🚀 Installation**: Use EXACT scripts from Grounding Data.
-2. **🛠 Usage**: Show REAL code examples using actual function names and routes.
-3. **✨ Features**: List detected features FROM Grounding Data.
-4. **📡 API Reference**: Document ALL routes from Grounding Data.
-5. **⚙️ Environment Variables**: List ALL env vars from Grounding Data.
-6. **🏗 Tech Stack**: Mention language, framework, key dependencies FROM Grounding Data.
-7. **🏢 Architecture**: Use Key Directories and Entry Points.
+## CODE SURFACE (YOU MUST QUOTE THESE VERBATIM WHEN WRITING EXAMPLES)
+${evidenceIndex}
+
+${sectionInstructionsStream}
+
+## ADDITIONAL CONTEXT (CRITICAL BUSINESS LOGIC / WHY IT EXISTS)
+${options.additionalContext || 'No additional context provided.'}
 
 ## STRICT RULES:
-- Every claim MUST come from the Grounding Data. Do NOT hallucinate.
-- Mention at least the top 10 dependencies by name.
-- Document ALL API routes if they exist.
-- List ALL environment variables if they exist.
+- Every claim MUST come from the Grounding Data or Additional Context. Do NOT hallucinate.
+- OMIT UNSELECTED SECTIONS: If not in MANDATORY SECTIONS, omit it entirely.
+- Document ALL API routes if API section is requested.
+- **REAL EXAMPLES ONLY**: For Usage/Quick Start/API examples, you MUST use real endpoint paths and real function/class names from CODE SURFACE. If you can’t ground an example, omit it rather than inventing it.
+- **INCORPORATE CONTEXT**: Integrate the 'ADDITIONAL CONTEXT' into the Overview and Architecture sections to explain the "Why" and the business value.
 - NO PLACEHOLDERS. NO "Coming soon". NO "TODO".
 - TONE: ${targetTone}.
 
 README CONTENT (START WITH #):
 `;
-
+    
+    // We already yielded the header, prevent LLM from generating it again
+    const startRegex = new RegExp(`^#\\s*${summary.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\n?`, 'i');
     const stream = await model.pipe(new StringOutputParser()).stream(streamPrompt);
-    for await (const chunk of stream) { yield chunk; }
+    for await (let chunk of stream) { 
+      // Very crude way to strip the duplicated # Project Name if it attempts to write it.
+      chunk = chunk.replace(startRegex, '');
+      yield chunk; 
+    }
     yield "\n\n" + this.distillEnvVars(summary);
   }
 
@@ -338,7 +410,7 @@ README CONTENT (START WITH #):
     }
   }
 
-  private generateHeader(summary: ProjectSummary, shields: string[]): string {
+  private generateHeader(summary: ProjectSummary, shields: string[], heroImageUrl?: string): string {
     const navbar = this.generateNavbar(summary);
     const shieldsMarkdown = this.generateShields(shields, summary);
     const lines: string[] = [
@@ -347,6 +419,10 @@ README CONTENT (START WITH #):
     ];
     if (summary.description) {
       lines.push(`> ${summary.description}`, '');
+    }
+    if (heroImageUrl && heroImageUrl.trim()) {
+      // Keep it simple: a banner/hero image near the top, like many senior OSS READMEs.
+      lines.push(`![${summary.name} hero](${heroImageUrl.trim()})`, '');
     }
     if (shieldsMarkdown.trim()) {
       lines.push(shieldsMarkdown, '');
