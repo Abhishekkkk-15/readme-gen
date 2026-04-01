@@ -11,35 +11,51 @@ export class ApiService {
 
   public async generateReadme(
     analysis: ProjectAnalysis,
-    options: { tone?: string; shields?: string[]; sections?: string[]; generateNested?: boolean; manualImportantFiles?: string[] } = {}
-  ): Promise<{ content: string; readmes?: { path: string, content: string }[] }> {
+    options: {
+      tone?: string;
+      persona?: string;
+      shields?: string[];
+      sections?: string[];
+      generateNested?: boolean;
+      manualImportantFiles?: string[];
+    } = {},
+  ): Promise<{ content: string; readmes?: { path: string; content: string }[] }> {
     const provider = configManager.get('provider');
     const groqKey = configManager.get('groqKey');
     const openaiKey = configManager.get('openaiKey');
+    const geminiKey = configManager.get('geminiKey');
 
-    const apiKey = provider === 'groq' ? groqKey : openaiKey;
+    const apiKey =
+      provider === 'groq' ? groqKey : provider === 'gemini' ? geminiKey : openaiKey;
 
     if (!apiKey) {
       throw new Error(`API key for ${provider} is not configured. Please run 'readmegen init' or 'config:set-key'.`);
     }
 
+    const backendProvider = provider === 'groq' ? 'groq' : provider === 'gemini' ? 'gemini' : 'openai';
+
     try {
-      const response = await axios.post(`${this.baseUrl}/generate`, {
-        title: analysis.summary.name,
-        description: analysis.summary.description,
-        features: options.sections || analysis.summary.features,
-        provider: provider === 'groq' ? 'groq' : 'openai', // Adjust if backend uses different naming
-        analysis,
-        tone: options.tone || 'professional',
-        shields: options.shields || ['license', 'stars'],
-        generateNested: options.generateNested,
-        manualImportantFiles: options.manualImportantFiles
-      }, {
-        headers: {
-          'x-api-key': apiKey,
-          'x-provider': provider
-        }
-      });
+      const response = await axios.post(
+        `${this.baseUrl}/generate`,
+        {
+          title: analysis.summary.name,
+          description: analysis.summary.description,
+          features: options.sections || analysis.summary.features,
+          provider: backendProvider,
+          analysis,
+          tone: options.tone || 'professional',
+          persona: options.persona || 'Senior Developer',
+          shields: options.shields || ['license', 'stars'],
+          generateNested: options.generateNested,
+          manualImportantFiles: options.manualImportantFiles,
+        },
+        {
+          headers: {
+            'x-api-key': apiKey,
+            'x-provider': backendProvider,
+          },
+        },
+      );
 
       return { content: response.data.content, readmes: response.data.readmes };
     } catch (error: any) {

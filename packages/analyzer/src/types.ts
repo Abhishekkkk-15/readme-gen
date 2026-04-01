@@ -11,6 +11,8 @@ export interface ProjectSummary {
   };
 
   scripts?: Record<string, string>;
+  /** Detected from lockfile during package analysis (npm | pnpm | yarn). */
+  packageManager?: string;
   dependencies?: string[];
   devDependencies?: string[];
 

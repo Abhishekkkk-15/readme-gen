@@ -177,7 +177,7 @@ export class LlmClient {
    * Gemini REST API: https://ai.google.dev/gemini-api/docs
    */
   private async callGemini(prompt: string, signal: AbortSignal): Promise<string> {
-    const model = this.model || 'gemini-1.5-flash';
+    const model = this.model || 'gemini-2.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
     const res = await fetch(url, {
       method: 'POST',

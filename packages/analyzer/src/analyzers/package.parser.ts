@@ -93,6 +93,7 @@ export class PackageParser {
     let packageManager = 'npm';
     if (Object.keys(allFiles).some(f => f.includes('pnpm-lock.yaml'))) packageManager = 'pnpm';
     else if (Object.keys(allFiles).some(f => f.includes('yarn.lock'))) packageManager = 'yarn';
+    else if (Object.keys(allFiles).some(f => f.endsWith('bun.lockb'))) packageManager = 'bun';
 
     return {
       name: primaryName || 'Unknown Node Project',

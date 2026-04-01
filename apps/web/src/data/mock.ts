@@ -78,6 +78,17 @@ export const mockModels: Model[] = [
     performanceScore: 82,
   },
   {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    provider: 'Google',
+    contextLength: 1000000,
+    pricing: { input: 0.3, output: 2.5 },
+    capabilities: ['Fast', 'Multimodal', 'Long context'],
+    isAvailable: true,
+    performanceScore: 93,
+    recommended: true,
+  },
+  {
     id: 'gemini-pro',
     name: 'Gemini 2.0 Pro',
     provider: 'Google',

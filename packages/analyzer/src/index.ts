@@ -12,6 +12,7 @@ export * from './analyzers/devops.analyzer';
 export * from './analyzers/semantic.refiner';
 export * from './types';
 export * from './utils/scanner';
+export * from './utils/scriptsMarkdown';
 
 // Production-grade semantic README pipeline
 export * from './internal/analysis/chunker';
@@ -24,3 +25,4 @@ export * from './internal/pipeline/merge';
 export * from './internal/pipeline/readme';
 export * from './internal/pipeline/runPipeline';
 export * from './internal/pipeline/quality';
+export * from './internal/pipeline/persona';

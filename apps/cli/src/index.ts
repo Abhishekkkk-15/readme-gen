@@ -5,12 +5,13 @@ import { initCommand } from './commands/init.js';
 import { generateCommand } from './commands/generate.js';
 import { generateReadmeSemanticCommand } from './commands/generate-readme.js';
 import { previewCommand } from './commands/preview.js';
-import { 
-  configViewCommand, 
-  configSetKeyCommand, 
-  configSetModelCommand, 
-  configResetCommand 
+import {
+  configViewCommand,
+  configSetKeyCommand,
+  configSetModelCommand,
+  configResetCommand,
 } from './commands/config/index.js';
+import { DEFAULT_PERSONA } from './constants/personas.js';
 
 const program = new Command();
 
@@ -27,7 +28,12 @@ program
 program
   .command('generate')
   .description('Analyze the current project and generate a README.md')
-  .option('-t, --tone <tone>', 'Set the README tone (professional, friendly, minimal, enterprise)')
+  .option('-t, --tone <tone>', 'Set the README tone (professional, friendly, minimal, enterprise, …)')
+  .option(
+    '--persona <persona>',
+    `Author voice (same as web UI). One of: Senior Developer | Startup Founder | Educational/Beginner | Open Source Contributor`,
+    DEFAULT_PERSONA,
+  )
   .option('-o, --output <file>', 'Output filename', 'README.md')
   .option('-y, --yes', 'Automatically answer yes to prompt (non-interactive)')
   .option('-n, --nested', 'Generate nested READMEs for sub-directories (Monorepos)')
@@ -37,9 +43,15 @@ program
 program
   .command('generate-readme')
   .description('Generate a production-grade README via the semantic JSON pipeline (no raw-code README generation)')
-  .option('-p, --provider <provider>', 'LLM provider (groq, gemini)', 'groq')
+  .option('-p, --provider <provider>', 'LLM provider (groq, gemini); defaults to gemini if CLI provider is gemini')
+  .option('-m, --model <id>', 'Model id (e.g. gemini-2.5-flash, gemini-2.0-flash, llama-3.3-70b-versatile)')
   .option('-o, --output <file>', 'Output filename', 'README.md')
   .option('-t, --tone <tone>', 'Tone (professional, friendly, minimal, enterprise)', 'professional')
+  .option(
+    '--persona <persona>',
+    `Author voice (web parity). E.g. "${DEFAULT_PERSONA}"`,
+    DEFAULT_PERSONA,
+  )
   .option('--hero <url>', 'Hero screenshot/banner image URL')
   .option('--context <text>', 'Extra business context ("why it exists")')
   .option('--timeout-ms <ms>', 'LLM timeout in ms', (v) => Number(v), 45000)
@@ -63,7 +75,7 @@ config
 config
   .command('set-key <key>')
   .description('Set API key for the current or specified provider')
-  .option('-p, --provider <provider>', 'Provider to set key for (groq, openai)')
+  .option('-p, --provider <provider>', 'Provider to set key for (groq, openai, gemini)')
   .action(configSetKeyCommand);
 
 config

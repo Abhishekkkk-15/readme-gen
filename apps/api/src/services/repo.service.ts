@@ -163,6 +163,7 @@ export class RepoService {
             }
           : undefined,
         scripts: packageMetadata?.scripts || {},
+        packageManager: packageMetadata?.packageManager,
         dependencies: packageMetadata?.dependencies?.production || [],
         devDependencies: packageMetadata?.dependencies?.development || [],
         entryPoints: structure.entryPoints,

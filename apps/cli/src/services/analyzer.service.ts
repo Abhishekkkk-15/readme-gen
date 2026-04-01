@@ -117,6 +117,7 @@ export class LocalAnalyzerService {
         evidence: packageMetadata.frameworks
       } : undefined,
       scripts: packageMetadata?.scripts || {},
+      packageManager: packageMetadata?.packageManager,
       dependencies: packageMetadata?.dependencies?.production || [],
       devDependencies: packageMetadata?.dependencies?.development || [],
       entryPoints: structure.entryPoints,

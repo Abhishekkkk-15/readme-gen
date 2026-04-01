@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { LocalAnalyzerService } from '../services/analyzer.service.js';
 import { apiService } from '../services/api.service.js';
 import { configManager } from '../config/config-manager.js';
+import { DEFAULT_PERSONA } from '../constants/personas.js';
 
 export async function previewCommand() {
   if (!configManager.isConfigured()) {
@@ -20,12 +21,13 @@ export async function previewCommand() {
     spinner.start('🤖 Generating preview with AI...');
     const readme = await apiService.generateReadme(analysis, {
       tone: 'professional',
-      shields: ['license', 'stars']
+      persona: DEFAULT_PERSONA,
+      shields: ['license', 'stars'],
     });
     spinner.succeed('Preview generated!');
 
     console.log(chalk.cyan('\n--- README PREVIEW ---\n'));
-    console.log(readme);
+    console.log(readme.content);
     console.log(chalk.cyan('\n--- END OF PREVIEW ---\n'));
     
     console.log(chalk.yellow('💡 Run "readmegen generate" to save this to README.md.\n'));

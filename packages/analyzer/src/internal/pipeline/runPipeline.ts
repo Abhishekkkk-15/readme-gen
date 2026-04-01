@@ -7,6 +7,7 @@ import { analyzeArchitecture, analyzeProjectIntent, extractFeatures } from './st
 import { mergeProjectUnderstanding } from './merge';
 import { generateReadmeFromSemanticJson } from './readme';
 import { ExtractedFacts, FinalProjectJSON, ReadmeGenerationInput } from './types';
+import { buildScriptsMarkdown } from '../../utils/scriptsMarkdown';
 
 export interface PipelineOptions {
   llm: Omit<LlmClientOptions, 'temperature'> & { temperature?: number };
@@ -26,6 +27,10 @@ export interface PipelineOptions {
    * Tone control for README (semantic JSON remains factual).
    */
   tone?: string;
+  /**
+   * Author persona / voice (matches web app).
+   */
+  persona?: string;
   /**
    * If provided, generator must include ONLY these sections.
    */
@@ -114,11 +119,15 @@ export async function runSemanticReadmePipeline(
     facts,
   });
 
+  const scriptsMd = buildScriptsMarkdown(analysis.summary);
+
   const readmeInput: ReadmeGenerationInput = {
     finalProject,
+    scriptsMarkdown: scriptsMd ?? undefined,
     additionalContext: options.additionalContext,
     heroImageUrl: options.heroImageUrl,
     tone: options.tone,
+    persona: options.persona,
     sections: options.sections,
     projectName: analysis.summary.name,
     projectDescription: analysis.summary.description,

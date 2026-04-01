@@ -1,4 +1,5 @@
 import { ProjectAnalysis, ProjectContext, ProjectSummary } from '../../types';
+import { buildScriptsMarkdown } from '../../utils/scriptsMarkdown';
 
 export interface EvidenceBlock {
   title: string;
@@ -43,12 +44,11 @@ function renderEnv(summary: ProjectSummary): EvidenceBlock | null {
 }
 
 function renderScripts(summary: ProjectSummary): EvidenceBlock | null {
-  const scripts = summary.scripts || {};
-  const entries = Object.entries(scripts);
-  if (entries.length === 0) return null;
+  const md = buildScriptsMarkdown(summary);
+  if (!md) return null;
   return {
     title: 'Scripts',
-    text: `## PACKAGE SCRIPTS\n${entries.map(([k, v]) => `- \`${k}\`: \`${v}\``).join('\n')}`,
+    text: `## PACKAGE SCRIPTS\n${md}`,
   };
 }
 

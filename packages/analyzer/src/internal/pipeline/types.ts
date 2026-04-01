@@ -59,6 +59,10 @@ export interface FinalProjectJSON {
 export interface ReadmeGenerationInput {
   finalProject: FinalProjectJSON;
   /**
+   * Pre-rendered scripts table (npm/pnpm/yarn + monorepo paths). Preferred over facts.scripts for Usage section.
+   */
+  scriptsMarkdown?: string;
+  /**
    * Optional extra business context. This is not code; it is user-supplied grounding.
    */
   additionalContext?: string;
@@ -70,6 +74,10 @@ export interface ReadmeGenerationInput {
    * Tone control.
    */
   tone?: string;
+  /**
+   * Author voice (Senior Developer, Startup Founder, etc.) — same as web app.
+   */
+  persona?: string;
   /**
    * Explicit sections toggle (if provided, generator must omit others).
    */
