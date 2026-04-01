@@ -10,6 +10,7 @@ import {
   ArrowFunction,
   Node
 } from 'ts-morph';
+import { PolyglotExtractors } from './polyglot.extractors';
 
 export class DefinitionExtractor {
   public static extract(files: Record<string, string>): Record<string, string[]> {
@@ -55,6 +56,12 @@ export class DefinitionExtractor {
         result[cleanPath] = definitions;
       }
     });
+
+    const polyglot = PolyglotExtractors.extractDefinitions(files);
+    for (const [p, defs] of Object.entries(polyglot)) {
+      if (!result[p]) result[p] = defs;
+      else result[p] = [...result[p]!, ...defs];
+    }
 
     return result;
   }

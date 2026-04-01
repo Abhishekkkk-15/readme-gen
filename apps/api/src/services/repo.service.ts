@@ -35,6 +35,7 @@ export class RepoService {
       const rootMetadata = [
         "package.json",
         "go.mod",
+        "go.work",
         "requirements.txt",
         "pyproject.toml",
         ".env.example",
@@ -78,9 +79,13 @@ export class RepoService {
       for (const entryPath of structure.entryPoints) {
         if (allFilePaths.includes(entryPath)) {
           const content = await this.getFileContent(owner, repo, entryPath);
-          this.traceImports(entryPath, content, allFilePaths).forEach((f) =>
-            tracedFiles.add(f),
-          );
+          const traced =
+            entryPath.match(/\.(ts|js|tsx|jsx)$/) ?
+              this.traceImports(entryPath, content, allFilePaths)
+            : entryPath.endsWith(".py") || entryPath.endsWith(".go") ?
+              this.tracePolyglotImports(entryPath, content, allFilePaths)
+            : [];
+          traced.forEach((f) => tracedFiles.add(f));
         }
       }
 
@@ -117,7 +122,7 @@ export class RepoService {
       const envVars = EnvExtractor.extract(importantContents);
       const astFeatures = AstFeatureDetector.detect(importantContents);
       const sourceFiles = importantFiles.filter((f) =>
-        f.match(/\.(ts|js|tsx|jsx)$/),
+        f.match(/\.(ts|js|tsx|jsx|py|go)$/),
       );
       console.log(
         `[RepoService] Analyzing ${sourceFiles.length} source files for definitions (including ${manualImportantFiles.length} manual files).`,
@@ -195,6 +200,58 @@ export class RepoService {
   /**
    * Simple trace of local file imports to find related logic
    */
+  private tracePolyglotImports(
+    filePath: string,
+    content: string,
+    allFiles: string[],
+  ): string[] {
+    if (filePath.endsWith(".go")) {
+      return this.traceGoImports(content, allFiles);
+    }
+    if (filePath.endsWith(".py")) {
+      return this.tracePythonImports(filePath, content, allFiles);
+    }
+    return [];
+  }
+
+  /** Resolve import paths against repo file list (suffix match). */
+  private traceGoImports(content: string, allFiles: string[]): string[] {
+    const out: string[] = [];
+    const quoted = [...content.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
+    for (const imp of quoted) {
+      if (!imp.includes("/") || imp.startsWith(".")) continue;
+      const parts = imp.split("/");
+      for (let i = 0; i < parts.length; i++) {
+        const sub = parts.slice(i).join("/");
+        for (const c of [sub + ".go", sub + "/main.go"]) {
+          if (allFiles.includes(c)) out.push(c);
+        }
+      }
+    }
+    return out;
+  }
+
+  private tracePythonImports(
+    filePath: string,
+    content: string,
+    allFiles: string[],
+  ): string[] {
+    const out: string[] = [];
+    const dir = filePath.includes("/")
+      ? filePath.split("/").slice(0, -1).join("/")
+      : "";
+    const rel = /from\s+\.([a-zA-Z0-9_]+)\s+import/g;
+    let m: RegExpExecArray | null;
+    while ((m = rel.exec(content)) !== null) {
+      const name = m[1]!;
+      const cand = dir ? `${dir}/${name}.py` : `${name}.py`;
+      if (allFiles.includes(cand)) out.push(cand);
+      const pkgInit = dir ? `${dir}/${name}/__init__.py` : `${name}/__init__.py`;
+      if (allFiles.includes(pkgInit)) out.push(pkgInit);
+    }
+    return out;
+  }
+
   private traceImports(
     filePath: string,
     content: string,
@@ -227,8 +284,12 @@ export class RepoService {
 
   private detectLanguage(files: string[]): string {
     const counts: Record<string, number> = {
-      TypeScript: files.filter((f) => f.endsWith(".ts")).length,
-      JavaScript: files.filter((f) => f.endsWith(".js")).length,
+      TypeScript: files.filter(
+        (f) => f.endsWith(".ts") || f.endsWith(".tsx"),
+      ).length,
+      JavaScript: files.filter(
+        (f) => f.endsWith(".js") || f.endsWith(".jsx"),
+      ).length,
       Python: files.filter((f) => f.endsWith(".py")).length,
       Go: files.filter((f) => f.endsWith(".go")).length,
     };

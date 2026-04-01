@@ -69,7 +69,7 @@ export class LocalAnalyzerService {
     ])).filter(f => fs.existsSync(path.join(this.rootPath, f))).slice(0, 70);
 
     console.log(`[LocalAnalyzer] Total files prioritized for analysis: ${importantFiles.length} (including ${manualImportantFiles.length} manual files)`);
-    const sourceFiles = importantFiles.filter(f => f.match(/\.(ts|js|tsx|jsx)$/));
+    const sourceFiles = importantFiles.filter(f => f.match(/\.(ts|js|tsx|jsx|py|go)$/));
     console.log(`[LocalAnalyzer] Found ${sourceFiles.length} source files for definition extraction.`);
 
     const importantContents: Record<string, string> = { ...fileContents };
@@ -154,11 +154,11 @@ export class LocalAnalyzerService {
 
   private detectLanguage(files: string[]): string {
     const counts: Record<string, number> = {
-      'TypeScript': files.filter(f => f.endsWith('.ts') || f.endsWith('.tsx')).length,
-      'JavaScript': files.filter(f => f.endsWith('.js') || f.endsWith('.jsx')).length,
-      'Python': files.filter(f => f.endsWith('.py')).length,
-      'Go': files.filter(f => f.endsWith('.go')).length,
+      TypeScript: files.filter((f) => f.endsWith('.ts') || f.endsWith('.tsx')).length,
+      JavaScript: files.filter((f) => f.endsWith('.js') || f.endsWith('.jsx')).length,
+      Python: files.filter((f) => f.endsWith('.py')).length,
+      Go: files.filter((f) => f.endsWith('.go')).length,
     };
-    return Object.entries(counts).reduce((a, b) => b[1] > a[1] ? b : a)[0];
+    return Object.entries(counts).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
   }
 }

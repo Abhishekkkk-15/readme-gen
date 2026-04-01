@@ -1,4 +1,5 @@
 import { Project, SyntaxKind, CallExpression, PropertyAccessExpression } from 'ts-morph';
+import { PolyglotExtractors } from './polyglot.extractors';
 
 export interface Route {
   method: string;
@@ -48,6 +49,6 @@ export class RouteExtractor {
       }
     }
 
-    return routes;
+    return [...routes, ...PolyglotExtractors.extractRoutes(files)];
   }
 }

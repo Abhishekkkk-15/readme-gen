@@ -30,6 +30,27 @@ export class EnvExtractor {
           envVars.add(match[1]);
         }
       }
+
+      if (filePath.endsWith('.py')) {
+        for (const m of content.matchAll(
+          /os\.(?:getenv|environ\.get)\(\s*["']([a-zA-Z_][a-zA-Z0-9_]*)["']/g,
+        )) {
+          envVars.add(m[1]!);
+        }
+        for (const m of content.matchAll(
+          /os\.environ\[\s*["']([a-zA-Z_][a-zA-Z0-9_]*)["']\s*\]/g,
+        )) {
+          envVars.add(m[1]!);
+        }
+      }
+
+      if (filePath.endsWith('.go')) {
+        for (const m of content.matchAll(
+          /os\.Getenv\(\s*["']([a-zA-Z_][a-zA-Z0-9_]*)["']\s*\)/g,
+        )) {
+          envVars.add(m[1]!);
+        }
+      }
     }
 
     return Array.from(envVars);

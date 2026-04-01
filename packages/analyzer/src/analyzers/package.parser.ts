@@ -20,8 +20,10 @@ export class PackageParser {
       return this.parseMultipleNode(packageFiles, files);
     }
 
-    if (files['requirements.txt'] || files['pyproject.toml']) {
-      return this.parsePython(files['requirements.txt'] || '', files['pyproject.toml'] || '');
+    const req = files['requirements.txt'] || '';
+    const pyproject = files['pyproject.toml'] || '';
+    if (req || pyproject) {
+      return this.parsePython(req, pyproject);
     }
     if (files['go.mod']) {
       return this.parseGo(files['go.mod']);
@@ -130,43 +132,233 @@ export class PackageParser {
   }
 
   private static parsePython(reqs: string, pyproject: string): PackageMetadata {
-    const frameworks: string[] = [];
-    if (reqs.includes('fastapi') || pyproject.includes('fastapi')) frameworks.push('FastAPI');
-    if (reqs.includes('flask') || pyproject.includes('flask')) frameworks.push('Flask');
-    if (reqs.includes('django') || pyproject.includes('django')) frameworks.push('Django');
+    const py = pyproject ? this.parsePyProjectToml(pyproject) : null;
+    const reqDeps = this.parseRequirementsTxt(reqs);
+    const prod = Array.from(
+      new Set([...(py?.deps || []), ...reqDeps]),
+    );
+    const dev = py?.devDeps || [];
+
+    const frameworks = this.detectPythonFrameworks(prod, dev, pyproject + reqs);
+
+    const scripts: Record<string, string> = { ...py?.scripts };
+    if (frameworks.includes('Django') && !scripts['manage']) {
+      scripts['manage'] = 'python manage.py <command>';
+    }
+
+    const packageManager = this.detectPythonPm(pyproject);
 
     return {
-      name: 'Python Project',
-      version: '1.0.0',
-      description: '',
-      scripts: {},
+      name: py?.name || 'Python Project',
+      version: py?.version || '1.0.0',
+      description: py?.description || '',
+      scripts,
       dependencies: {
-        production: reqs.split('\n').filter(l => l.trim() && !l.startsWith('#')),
-        development: [],
+        production: prod,
+        development: dev,
         peer: [],
       },
       frameworks,
-      packageManager: pyproject ? 'poetry/pip' : 'pip',
+      packageManager,
     };
+  }
+
+  private static detectPythonPm(pyproject: string): string {
+    if (!pyproject) return 'pip';
+    if (/\[tool\.poetry\]/i.test(pyproject)) return 'poetry';
+    if (/\[tool\.uv\]/i.test(pyproject) || /uv\.lock/i.test(pyproject))
+      return 'uv';
+    if (/\[tool\.pdm\]/i.test(pyproject)) return 'pdm';
+    if (/\[tool\.hatch\]/i.test(pyproject)) return 'hatch';
+    return 'pip';
+  }
+
+  private static parseRequirementsTxt(content: string): string[] {
+    const names: string[] = [];
+    for (const line of content.split('\n')) {
+      const name = this.parseRequirementLine(line);
+      if (name) names.push(name);
+    }
+    return names;
+  }
+
+  /** pip / requirements.txt line → distribution name */
+  private static parseRequirementLine(line: string): string | null {
+    const t = line.trim();
+    if (!t || t.startsWith('#') || t.startsWith('-')) return null;
+    const head = t.split(/[;#]/)[0]!.trim();
+    if (!head) return null;
+    const noVersion = head.split(/\s*[<>=~!]/)[0]!.trim();
+    const noExtra = noVersion.split(/[\[]/)[0]!.trim();
+    const name = noExtra.split(/[@\s]/)[0]!.trim();
+    if (!name || !/^[a-zA-Z0-9._-]+$/.test(name)) return null;
+    return name;
+  }
+
+  private static parsePyProjectToml(content: string): {
+    name?: string;
+    version?: string;
+    description?: string;
+    deps: string[];
+    devDeps: string[];
+    scripts: Record<string, string>;
+  } {
+    const deps: string[] = [];
+    const devDeps: string[] = [];
+    const scripts: Record<string, string> = {};
+    let name: string | undefined;
+    let version: string | undefined;
+    let description: string | undefined;
+
+    let section = '';
+    const lines = content.split('\n');
+    for (const raw of lines) {
+      const line = raw.split('#')[0]!.trim();
+      const sec = line.match(/^\[([^\]]+)\]/);
+      if (sec) {
+        section = sec[1]!.toLowerCase();
+        continue;
+      }
+      if (section === 'project') {
+        const nm = line.match(/^name\s*=\s*["']([^"']+)["']/i);
+        const ver = line.match(/^version\s*=\s*["']([^"']+)["']/i);
+        const desc = line.match(/^description\s*=\s*["']([^"']*)["']/i);
+        if (nm) name = nm[1];
+        if (ver) version = ver[1];
+        if (desc) description = desc[1];
+      }
+      if (
+        section === 'tool.poetry.dependencies' ||
+        section === 'tool.poetry.group.dev.dependencies'
+      ) {
+        const depKey = line.match(/^([a-zA-Z0-9_.-]+)\s*=/);
+        if (depKey && depKey[1]!.toLowerCase() !== 'python') {
+          if (section.includes('dev')) devDeps.push(depKey[1]!);
+          else deps.push(depKey[1]!);
+        }
+      }
+      if (section === 'tool.poetry.scripts') {
+        const sc = line.match(/^([a-zA-Z0-9_.-]+)\s*=\s*["']([^"']+)["']/);
+        if (sc) scripts[sc[1]!] = sc[2]!;
+      }
+    }
+
+    return { name, version, description, deps, devDeps, scripts };
+  }
+
+  private static detectPythonFrameworks(
+    prod: string[],
+    dev: string[],
+    raw: string,
+  ): string[] {
+    const all = [...prod, ...dev].map((d) => d.toLowerCase());
+    const text = raw.toLowerCase();
+    const frameworks: string[] = [];
+    const add = (f: string) => {
+      if (!frameworks.includes(f)) frameworks.push(f);
+    };
+    const has = (s: string) =>
+      all.some((d) => d.includes(s)) || text.includes(s);
+    if (has('fastapi')) add('FastAPI');
+    if (has('flask')) add('Flask');
+    if (has('django')) add('Django');
+    if (has('starlette')) add('Starlette');
+    if (has('tornado')) add('Tornado');
+    if (has('sanic')) add('Sanic');
+    if (has('litestar')) add('Litestar');
+    if (has('sqlalchemy')) add('SQLAlchemy');
+    if (has('pydantic')) add('Pydantic');
+    if (has('celery')) add('Celery');
+    if (has('pytest')) add('pytest');
+    return frameworks;
   }
 
   private static parseGo(content: string): PackageMetadata {
     const lines = content.split('\n');
-    const moduleLine = lines.find(l => l.startsWith('module '));
-    const name = moduleLine ? moduleLine.replace('module ', '').trim() : 'Go Project';
+    const moduleLine = lines.find((l) => l.trim().startsWith('module '));
+    const name = moduleLine
+      ? moduleLine.replace(/^\s*module\s+/, '').trim().split(/\s+/)[0]!
+      : 'Go Project';
+
+    const modules = this.parseGoRequireBlock(content);
+    const frameworks = this.detectGoFrameworks(modules);
+
+    const scripts: Record<string, string> = {
+      build: 'go build ./...',
+      test: 'go test ./...',
+      vet: 'go vet ./...',
+      mod: 'go mod tidy',
+    };
 
     return {
       name,
       version: '1.0.0',
       description: '',
-      scripts: {},
+      scripts,
       dependencies: {
-        production: lines.filter(l => l.includes('require')).map(l => l.trim()),
+        production: modules,
         development: [],
         peer: [],
       },
-      frameworks: [],
+      frameworks,
       packageManager: 'go mod',
     };
+  }
+
+  private static parseGoRequireBlock(content: string): string[] {
+    const mods: string[] = [];
+    const lines = content.split('\n');
+    let inBlock = false;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (line.startsWith('require (')) {
+        inBlock = true;
+        continue;
+      }
+      if (inBlock && line === ')') {
+        inBlock = false;
+        continue;
+      }
+      if (inBlock && line && !line.startsWith('//') && !line.startsWith('replace ')) {
+        const modPath = line.split(/\s+/)[0]!;
+        if (modPath) mods.push(modPath);
+        continue;
+      }
+      if (line.startsWith('require ') && !line.includes('(')) {
+        const rest = line.replace(/^require\s+/, '').trim();
+        const modPath = rest.split(/\s+/)[0]!;
+        if (modPath && !modPath.startsWith('//')) mods.push(modPath);
+      }
+    }
+    return Array.from(new Set(mods));
+  }
+
+  private static detectGoFrameworks(modules: string[]): string[] {
+    const frameworks: string[] = [];
+    const add = (f: string) => {
+      if (!frameworks.includes(f)) frameworks.push(f);
+    };
+    const s = modules.join(' ').toLowerCase();
+    const pairs: [string, string][] = [
+      ['gin-gonic/gin', 'Gin'],
+      ['labstack/echo', 'Echo'],
+      ['gofiber/fiber', 'Fiber'],
+      ['go-chi/chi', 'chi'],
+      ['gorilla/mux', 'Gorilla mux'],
+      ['google.golang.org/grpc', 'gRPC'],
+      ['grpc-go', 'gRPC'],
+      ['grpc/grpc-go', 'gRPC'],
+      ['spf13/cobra', 'Cobra'],
+      ['spf13/viper', 'Viper'],
+      ['stretchr/testify', 'testify'],
+      ['jackc/pgx', 'pgx'],
+      ['go-redis/redis', 'Redis'],
+      ['gorm.io/gorm', 'GORM'],
+      ['entgo.io/ent', 'Ent'],
+    ];
+    for (const [needle, label] of pairs) {
+      if (s.includes(needle)) add(label);
+    }
+    return frameworks;
   }
 }

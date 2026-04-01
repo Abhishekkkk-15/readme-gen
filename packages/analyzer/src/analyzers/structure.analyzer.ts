@@ -6,7 +6,20 @@ export interface FileEntry {
 }
 
 export class StructureAnalyzer {
-  private static ENTRY_POINTS = ['index.ts', 'index.js', 'main.py', 'app.ts', 'app.js', 'server.ts', 'server.js', 'go.mod'];
+  private static ENTRY_BASE_NAMES = new Set([
+    'index.ts',
+    'index.js',
+    'main.py',
+    'app.ts',
+    'app.js',
+    'server.ts',
+    'server.js',
+    '__main__.py',
+    'manage.py',
+    'wsgi.py',
+    'asgi.py',
+    'app.py',
+  ]);
 
   public static async analyze(files: string[], gitignoreContent: string): Promise<{
     entryPoints: string[];
@@ -21,11 +34,29 @@ export class StructureAnalyzer {
 
     const normalizedFiles = files.map(f => f.replace(/\\/g, '/'));
     const filteredFiles = normalizedFiles.filter(f => !ig.ignores(f));
-    const entryPoints = filteredFiles.filter(f => this.ENTRY_POINTS.includes(f.split('/').pop() || ''));
+    const entryPoints = filteredFiles.filter(f => this.isEntryPoint(f));
     
     // Key directories detection
     const directories = new Set<string>();
-    const keyPatterns = ['src', 'lib', 'app', 'tests', 'docs', 'config', 'packages', 'apps', 'controllers', 'routes', 'services'];
+    const keyPatterns = [
+      'src',
+      'lib',
+      'app',
+      'tests',
+      'docs',
+      'config',
+      'packages',
+      'apps',
+      'controllers',
+      'routes',
+      'services',
+      'cmd',
+      'internal',
+      'pkg',
+      'api',
+      'handlers',
+      'middleware',
+    ];
     
     filteredFiles.forEach(f => {
       const parts = f.split('/');
@@ -44,7 +75,9 @@ export class StructureAnalyzer {
       f === 'pnpm-workspace.yaml' || 
       f === 'lerna.json' || 
       f === 'turbo.json' ||
-      (f.endsWith('package.json') && filteredFiles.some(file => file.startsWith('packages/') || file.startsWith('apps/')))
+      f === 'go.work' ||
+      (f.endsWith('package.json') && filteredFiles.some(file => file.startsWith('packages/') || file.startsWith('apps/'))) ||
+      (f.endsWith('go.mod') && filteredFiles.some(file => file.startsWith('cmd/') || file.startsWith('internal/')))
     );
 
     // Scored files
@@ -75,6 +108,10 @@ export class StructureAnalyzer {
     if (lowerPath.includes('route')) score += 60;
     if (lowerPath.includes('api/')) score += 50; 
     if (lowerPath.includes('service')) score += 40;
+    if (lowerPath.endsWith('.py') && (lowerPath.includes('handler') || lowerPath.includes('/api/'))) score += 45;
+    if (lowerPath.endsWith('.go') && (lowerPath.includes('handler') || lowerPath.includes('/http'))) score += 45;
+    if (lowerPath.includes('/cmd/')) score += 35;
+    if (lowerPath.includes('/internal/')) score += 25;
     
     // Monorepo specific deep scoring
     if (lowerPath.includes('apps/') && (lowerPath.includes('/src/') || lowerPath.includes('/app/') || lowerPath.includes('/pages/'))) score += 30;
@@ -105,6 +142,15 @@ export class StructureAnalyzer {
       }
     });
     return tree.slice(0, 500); // Increased count to 500
+  }
+
+  private static isEntryPoint(filePath: string): boolean {
+    const parts = filePath.split('/');
+    const base = parts.pop() || '';
+    if (this.ENTRY_BASE_NAMES.has(base)) return true;
+    if (base === 'main.go') return true;
+    if (parts[parts.length - 1] === 'cmd' && base === 'main.go') return true;
+    return false;
   }
 }
 

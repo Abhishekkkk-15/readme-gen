@@ -7,6 +7,12 @@ function escapeInlineCode(s: string): string {
 
 function packageManagerRun(pm: string | undefined): { label: string; runWord: string } {
   const p = (pm || 'npm').toLowerCase();
+  if (p === 'go mod' || p === 'go') return { label: 'go', runWord: 'go run' };
+  if (p === 'poetry') return { label: 'poetry', runWord: 'poetry run' };
+  if (p === 'uv') return { label: 'uv', runWord: 'uv run' };
+  if (p === 'pdm') return { label: 'pdm', runWord: 'pdm run' };
+  if (p === 'hatch') return { label: 'hatch', runWord: 'hatch run' };
+  if (p === 'pip') return { label: 'pip', runWord: 'python -m' };
   if (p === 'pnpm') return { label: 'pnpm', runWord: 'pnpm run' };
   if (p === 'yarn') return { label: 'yarn', runWord: 'yarn' };
   if (p === 'bun') return { label: 'bun', runWord: 'bun run' };
@@ -39,6 +45,10 @@ function howToRun(
   const { workspaceDir, scriptName } = parseScriptKey(scriptKey);
   const value = rawValue.trim();
 
+  if (/^(go|python|pytest|uv|poetry|pdm|ruff|black|hatch)\s/i.test(value)) {
+    return { command: value };
+  }
+
   if (workspaceDir) {
     const cmd = `cd ${workspaceDir} && ${runWord} ${scriptName}`;
     return {
@@ -56,7 +66,43 @@ function howToRun(
 export function buildScriptsMarkdown(summary: ProjectSummary): string | null {
   const scripts = summary.scripts || {};
   const entries = Object.entries(scripts);
-  if (entries.length === 0) return null;
+  if (entries.length === 0) {
+    const pm = (summary.packageManager || '').toLowerCase();
+    if (pm === 'go mod' || pm === 'go') {
+      return [
+        '_Detected: **Go modules**._',
+        '',
+        '| Task | Command |',
+        '| --- | --- |',
+        '| build | `go build ./...` |',
+        '| test | `go test ./...` |',
+        '| vet | `go vet ./...` |',
+        '| tidy | `go mod tidy` |',
+      ].join('\n');
+    }
+    if (['pip', 'poetry', 'uv', 'pdm', 'hatch'].includes(pm)) {
+      const install =
+        pm === 'poetry'
+          ? 'poetry install'
+          : pm === 'uv'
+            ? 'uv sync'
+            : pm === 'pdm'
+              ? 'pdm install'
+              : pm === 'hatch'
+                ? 'hatch env create'
+                : 'pip install -r requirements.txt';
+      return [
+        `_Detected: **${pm}**._`,
+        '',
+        '| Task | Command |',
+        '| --- | --- |',
+        '| install | `' + install + '` |',
+        '| tests | `pytest` |',
+        '| types | `mypy .` _if configured_ |',
+      ].join('\n');
+    }
+    return null;
+  }
 
   const { label } = packageManagerRun(summary.packageManager);
 

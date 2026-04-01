@@ -128,6 +128,46 @@ export class AstFeatureDetector {
       }
     }
 
+    for (const [filePath, content] of Object.entries(files)) {
+      if (filePath.endsWith('.py')) {
+        if (/@(?:app|router)\.(get|post|put|delete|patch)\s*\(/i.test(content)) {
+          addEvidence('API Endpoints', 'FastAPI/Starlette-style route decorators', filePath);
+        }
+        if (/flask|Flask\(__name__\)/.test(content) || /@app\.route\s*\(/i.test(content)) {
+          addEvidence('API Endpoints', 'Flask routes', filePath);
+        }
+        if (/django\.|from\s+django/.test(content)) {
+          addEvidence('Django application', 'Django imports', filePath);
+        }
+        if (/sqlalchemy|SQLAlchemy/.test(content)) {
+          addEvidence('Database Integration', 'SQLAlchemy', filePath);
+        }
+        if (/os\.getenv|os\.environ/.test(content)) {
+          addEvidence('Environment Configuration', 'os.getenv / os.environ', filePath);
+        }
+        if (/celery|Celery/.test(content)) {
+          addEvidence('Task queue', 'Celery', filePath);
+        }
+      }
+      if (filePath.endsWith('.go')) {
+        if (/gin-gonic\/gin|\.GET\s*\(|\.POST\s*\(/.test(content)) {
+          addEvidence('API Endpoints', 'Go HTTP handlers (gin / stdlib style)', filePath);
+        }
+        if (/gorm\.io|database\/sql|jackc\/pgx/.test(content)) {
+          addEvidence('Database Integration', 'Go database client', filePath);
+        }
+        if (/os\.Getenv/.test(content)) {
+          addEvidence('Environment Configuration', 'os.Getenv', filePath);
+        }
+        if (/spf13\/cobra/.test(content)) {
+          addEvidence('CLI Tool', 'Cobra CLI', filePath);
+        }
+        if (/grpc\.|google\.golang\.org\/grpc/.test(content)) {
+          addEvidence('gRPC', 'gRPC imports', filePath);
+        }
+      }
+    }
+
     return Array.from(features.values());
   }
 }
