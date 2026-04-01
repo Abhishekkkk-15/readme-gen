@@ -1,6 +1,14 @@
 export interface ProjectSummary {
   name: string;
   description?: string;
+  existingReadme?: {
+    path: string;
+    content: string;
+  };
+  nestedReadmes?: {
+    path: string;
+    content: string;
+  }[];
   language: string;
   features: string[];
 

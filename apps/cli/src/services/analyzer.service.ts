@@ -40,6 +40,11 @@ export class LocalAnalyzerService {
 
     // 1. Fetch metadata files (package.json, go.mod, etc.)
     const metadataFiles = allFilePaths.filter(f => 
+      f === 'README.md' ||
+      f === 'README.mdx' ||
+      f === 'README.txt' ||
+      /^(?:apps|packages)\/[^/]+\/README(?:\.[^./]+)?\.md$/i.test(f) ||
+      /^(?:apps|packages)\/[^/]+\/README\.txt$/i.test(f) ||
       f.includes('package.json') || 
       f.endsWith('go.mod') || 
       f.endsWith('requirements.txt') || 
@@ -102,9 +107,25 @@ export class LocalAnalyzerService {
     };
 
     // 7. Assemble Final Analysis
+    const existingReadmePath = ['README.md', 'README.mdx', 'README.txt'].find((f) => Boolean(fileContents[f]))
+    const nestedReadmes = Object.entries(fileContents)
+      .filter(([filePath]) =>
+        /^(?:apps|packages)\/[^/]+\/README(?:\.[^./]+)?\.md$/i.test(filePath) ||
+        /^(?:apps|packages)\/[^/]+\/README\.txt$/i.test(filePath),
+      )
+      .map(([filePath, content]) => ({
+        path: filePath,
+        content: String(content || '').slice(0, 20000),
+      }))
+
     const summary: ProjectSummary = {
       name: packageMetadata?.name || path.basename(this.rootPath),
       description: packageMetadata?.description || '',
+      existingReadme: existingReadmePath ? {
+        path: existingReadmePath,
+        content: String(fileContents[existingReadmePath] || '').slice(0, 20000),
+      } : undefined,
+      nestedReadmes,
       language: this.detectLanguage(allFilePaths),
       features: astFeatures.map(f => f.name),
       astFeatures,

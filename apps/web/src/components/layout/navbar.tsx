@@ -168,11 +168,13 @@ export function Navbar() {
               <DropdownMenuTrigger
                 render={
                   <Button variant="ghost" size="sm" className="gap-2 px-1.5">
-                    <Avatar className="size-8">
-                      <AvatarFallback className="bg-primary/15 text-primary text-xs">
-                        <Link to={"/auth"}>{initial}</Link>
-                      </AvatarFallback>
-                    </Avatar>
+                    <Link to={"/dashboard"}>
+                      <Avatar className="size-8">
+                        <AvatarFallback className="bg-primary/15 text-primary text-xs">
+                          {initial}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Link>
                     {isGuest ?
                       <Badge
                         variant="secondary"

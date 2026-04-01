@@ -33,6 +33,9 @@ export class RepoService {
 
       // 1. Fetch metadata files (including nested package.json/go.mod for monorepos)
       const rootMetadata = [
+        "README.md",
+        "README.mdx",
+        "README.txt",
         "package.json",
         "go.mod",
         "go.work",
@@ -51,8 +54,14 @@ export class RepoService {
             (f.startsWith("apps/") || f.startsWith("packages/")),
         )
         .slice(0, 10);
+      const nestedReadmeFiles = allFilePaths
+        .filter((f) =>
+          f.match(/^(?:apps|packages)\/[^\/]+\/README(?:\.[^.\/]+)?\.md$/i) ||
+          f.match(/^(?:apps|packages)\/[^\/]+\/README\.txt$/i),
+        )
+        .slice(0, 20);
 
-      const metadataFiles = [...rootMetadata, ...nestedMetadata];
+      const metadataFiles = [...rootMetadata, ...nestedMetadata, ...nestedReadmeFiles];
       const fileContents: Record<string, string> = {};
 
       for (const file of metadataFiles) {
@@ -151,11 +160,31 @@ export class RepoService {
       const examples = ExampleAnalyzer.analyze(importantContents);
 
       // 7. Assemble Final Analysis (Split into Summary and Context)
+      const existingReadmePath = [
+        "README.md",
+        "README.mdx",
+        "README.txt",
+      ].find((path) => Boolean(fileContents[path]));
+      const nestedReadmes = nestedReadmeFiles
+        .filter((path) => Boolean(fileContents[path]))
+        .map((path) => ({
+          path,
+          content: String(fileContents[path] || "").slice(0, 20000),
+        }));
+
       const summary: ProjectSummary = {
         name: String(packageMetadata?.name || repo),
         description: String(
           packageMetadata?.description || repoData?.description || "",
         ),
+        existingReadme:
+          existingReadmePath ?
+            {
+              path: existingReadmePath,
+              content: String(fileContents[existingReadmePath] || "").slice(0, 20000),
+            }
+          : undefined,
+        nestedReadmes,
         language: this.detectLanguage(allFilePaths),
         features: astFeatures.map((f) => f.name),
         astFeatures,

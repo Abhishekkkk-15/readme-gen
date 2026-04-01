@@ -43,6 +43,12 @@ class LLMService {
     const includeApi = includeAll || selectedSections.includes("API");
     const includeUsage = includeAll || selectedSections.includes("Usage");
 
+    if (summary.existingReadme?.content?.trim()) {
+      sections.push(
+        `### EXISTING README (${summary.existingReadme.path})\nUse this as source material to revise, expand, and correct. Preserve useful wording, sections, and examples where accurate; replace outdated or generic content when grounding data contradicts it.\n\n\`\`\`md\n${summary.existingReadme.content.trim().slice(0, 12000)}\n\`\`\``,
+      );
+    }
+
     // --- TECH STACK SUMMARY (one-liner the LLM can copy) ---
     const stackParts: string[] = [];
     if (summary.language) stackParts.push(summary.language);
@@ -323,6 +329,7 @@ README CONTENT (open exactly as the template does — usually a single \`#\` tit
 `
       : `## STRICT RULES:
 - **GROUNDING FIRST**: Every claim must come from the Grounding Data or Additional Context above. Do NOT invent features, dependencies, or commands.
+- **EXISTING README HANDLING**: If an EXISTING README is provided, treat this task as a rewrite/update pass. Reuse valuable structure and wording where it is still accurate, but fix stale, weak, or generic sections using the grounded facts.
 - **OMIT UNSELECTED SECTIONS**: If a section is not listed in MANDATORY SECTIONS, do NOT generate it.
 - **MENTION DEPENDENCIES**: Reference key dependencies by name when discussing the tech stack.
 - **MENTION ALL ROUTES/ENV VARS**: If API/Env sections are requested, list them all.
@@ -661,6 +668,12 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const targetTone = options.tone || "professional";
 
     for (const dir of nestedDirs) {
+      const existingNestedReadme = (summary.nestedReadmes || []).find(
+        (item) =>
+          item.path === `${dir}/README.md` ||
+          item.path === `${dir}/README.mdx` ||
+          item.path === `${dir}/README.txt`,
+      );
       const dirScripts = Object.entries(summary.scripts || {})
         .filter(([key]) => key.startsWith(`${dir}:`))
         .reduce<Record<string, string>>((acc, [key, val]) => {
@@ -677,6 +690,15 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
       const pm = summary.packageManager || "npm";
 
       const dirRole = dir.includes("apps/") ? "Application" : "Package/Library";
+      const existingReadmeBlock =
+        existingNestedReadme?.content?.trim()
+          ? `Existing sub-project README (${existingNestedReadme.path}):
+\`\`\`md
+${existingNestedReadme.content.trim().slice(0, 12000)}
+\`\`\`
+
+`
+          : "";
       const dirPrompt = `Generate a dedicated README.md for a sub-project in a monorepo.
 Sub-project Directory: ${dir}
 Type: ${dirRole}
@@ -685,8 +707,9 @@ Package manager (repo): ${pm}
 Sub-project Scripts:
 ${scriptsHuman || "(no scripts parsed for this package — infer from context)"}
 
-TASK:
+${existingReadmeBlock}TASK:
 Write a UNIQUE README for this specific component. Explain its individual role and purpose within the parent project.
+If an existing sub-project README is provided above, treat this as an update/rewrite pass: preserve useful structure and accurate details, but replace stale, thin, or generic content with grounded information.
 Use the exact run commands listed above (${pm}, from repo root or \`cd ${dir}\`).
 Include a brief list of its core dependencies if available.
 NO PLACEHOLDERS. START WITH # ${dir.split("/").pop()}.
