@@ -29,6 +29,7 @@ program
   .command('generate')
   .description('Analyze the current project and generate a README.md')
   .option('-t, --tone <tone>', 'Set the README tone (professional, friendly, minimal, enterprise, …)')
+  .option('--template <id>', 'Built-in template id for API-backed generation')
   .option(
     '--persona <persona>',
     `Author voice (same as web UI). One of: Senior Developer | Startup Founder | Educational/Beginner | Open Source Contributor`,

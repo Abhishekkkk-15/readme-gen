@@ -7,6 +7,7 @@ import { LocalAnalyzerService } from '../services/analyzer.service.js';
 import { apiService } from '../services/api.service.js';
 import { configManager } from '../config/config-manager.js';
 import { DEFAULT_PERSONA, PERSONA_CLI_CHOICES } from '../constants/personas.js';
+import { CLI_README_TEMPLATES, findCliTemplate } from '../constants/templates.js';
 
 export async function generateCommand(options: {
   tone?: string;
@@ -15,6 +16,7 @@ export async function generateCommand(options: {
   yes?: boolean;
   nested?: boolean;
   files?: string[];
+  template?: string;
 }) {
   if (!configManager.isConfigured()) {
     console.log(chalk.red('\n❌ CLI is not configured. Run "readmegen init" first.\n'));
@@ -58,6 +60,13 @@ export async function generateCommand(options: {
       options.tone || (configManager.get('provider') === 'groq' ? 'professional' : 'friendly');
     let selectedPersona = options.persona?.trim() || DEFAULT_PERSONA;
     let generateNested = options.nested || false;
+    let selectedTemplate = findCliTemplate(options.template);
+
+    if (options.template && !selectedTemplate) {
+      throw new Error(
+        `Unknown template "${options.template}". Available IDs: ${CLI_README_TEMPLATES.map((t) => t.id).join(', ')}`,
+      );
+    }
 
     if (!options.yes) {
       const answers = await inquirer.prompt([
@@ -101,6 +110,19 @@ export async function generateCommand(options: {
           default: selectedPersona,
         },
         {
+          type: 'list',
+          name: 'templateId',
+          message: 'Select a README template:',
+          choices: [
+            { name: 'None (default prompt structure)', value: 'none' },
+            ...CLI_README_TEMPLATES.map((template) => ({
+              name: `${template.name} (${template.id})`,
+              value: template.id,
+            })),
+          ],
+          default: selectedTemplate?.id || 'none',
+        },
+        {
           type: 'confirm',
           name: 'generateNested',
           message: 'Generate nested READMEs for sub-directories (Monorepos)?',
@@ -110,6 +132,9 @@ export async function generateCommand(options: {
       selectedSections = answers.sections;
       selectedTone = answers.tone;
       selectedPersona = answers.persona;
+      selectedTemplate = findCliTemplate(
+        answers.templateId === 'none' ? undefined : answers.templateId,
+      );
       generateNested = answers.generateNested;
     }
 
@@ -121,6 +146,7 @@ export async function generateCommand(options: {
       shields: ['license', 'stars', 'version'],
       generateNested,
       manualImportantFiles: manualFiles,
+      readmeTemplate: selectedTemplate ? { id: selectedTemplate.id, body: selectedTemplate.body } : undefined,
     });
     spinner.succeed('README generated!');
 
@@ -154,6 +180,9 @@ export async function generateCommand(options: {
         fs.writeFileSync(fullPath, file.content);
         console.log(chalk.green(`  -> Written to ${file.path}`));
       }
+    }
+    if (selectedTemplate) {
+      console.log(chalk.dim(`Template: ${selectedTemplate.name} (${selectedTemplate.id})`));
     }
     console.log(chalk.dim(`Persona: ${selectedPersona}`));
     console.log();

@@ -31,8 +31,14 @@ class LLMService {
    * Build a comprehensive grounding context from ProjectSummary.
    * Formats data as copy-paste-ready markdown blocks the LLM can directly include.
    */
-  private buildGroundingContext(summary: ProjectSummary): string {
+  private buildGroundingContext(
+    summary: ProjectSummary,
+    selectedSections: string[] = [],
+  ): string {
     const sections: string[] = [];
+    const includeAll = selectedSections.length === 0;
+    const includeApi = includeAll || selectedSections.includes("API");
+    const includeUsage = includeAll || selectedSections.includes("Usage");
 
     // --- TECH STACK SUMMARY (one-liner the LLM can copy) ---
     const stackParts: string[] = [];
@@ -65,7 +71,7 @@ class LLMService {
 
     // --- ROUTES as a table ---
     const routes = summary.routes || [];
-    if (routes.length > 0) {
+    if (includeApi && routes.length > 0) {
       const header =
         "| Method | Endpoint | Source File |\n|--------|----------|-------------|";
       const rows = routes.map(
@@ -80,7 +86,7 @@ class LLMService {
     const routeSnippets = (summary.routes || [])
       .filter((r) => Boolean(r.snippet))
       .slice(0, 8);
-    if (routeSnippets.length > 0) {
+    if ((includeApi || includeUsage) && routeSnippets.length > 0) {
       sections.push(
         `### ROUTE HANDLER SNIPPETS (use these verbatim for API descriptions/examples):\n` +
           routeSnippets
@@ -250,7 +256,9 @@ class LLMService {
     summary: ProjectSummary,
   ): string {
     const year = new Date().getFullYear();
-    const desc = (summary.description || "").replace(/\s+/g, " ").slice(0, 1200);
+    const desc = (summary.description || "")
+      .replace(/\s+/g, " ")
+      .slice(0, 1200);
     return `## STRUCTURE TEMPLATE
 TEMPLATE_JSON is a JSON-encoded string of the README markdown skeleton you must reproduce structurally.
 
@@ -276,11 +284,7 @@ ${JSON.stringify(templateMarkdown)}
     analysis: ProjectAnalysis,
     options: Pick<
       GenerateReadmeOptions,
-      | "sections"
-      | "tone"
-      | "additionalContext"
-      | "persona"
-      | "readmeTemplate"
+      "sections" | "tone" | "additionalContext" | "persona" | "readmeTemplate"
     >,
     projectManifest: string,
     technicalTruthMap: string,
@@ -292,16 +296,20 @@ ${JSON.stringify(templateMarkdown)}
     );
     const tpl = options.readmeTemplate?.body?.trim();
     const usesTemplate = Boolean(tpl);
-    const groundingContext = this.buildGroundingContext(summary);
+    const groundingContext = this.buildGroundingContext(
+      summary,
+      options.sections,
+    );
     const evidenceIndex = this.buildEvidenceIndex(context);
-    const sectionInstructions = usesTemplate
-      ? `## SECTIONS\nUse **only** the STRUCTURE TEMPLATE for which headings exist and their order. Ignore any conflicting free-form section list.`
+    const sectionInstructions =
+      usesTemplate ?
+        `## SECTIONS\nUse **only** the STRUCTURE TEMPLATE for which headings exist and their order. Ignore any conflicting free-form section list.`
       : this.buildSectionPrompt(options.sections);
-    const templateBlock = usesTemplate
-      ? this.formatReadmeTemplateSpec(tpl!, summary)
-      : "";
-    const strictRules = usesTemplate
-      ? `## STRICT RULES:
+    const templateBlock =
+      usesTemplate ? this.formatReadmeTemplateSpec(tpl!, summary) : "";
+    const strictRules =
+      usesTemplate ?
+        `## STRICT RULES:
 - **TEMPLATE STRUCTURE IS LAW**: Mirror TEMPLATE_JSON — heading hierarchy/order/titles (after placeholders), table shapes, fence languages, and section count must match.
 - **GROUNDING**: All factual claims from GROUNDING DATA, CODE SURFACE, or ADDITIONAL CONTEXT only.
 - **EXAMPLES**: Prefer real commands, routes, and identifiers from CODE SURFACE; do not invent HTTP paths or CLI flags.
@@ -394,7 +402,7 @@ ${strictRules}`;
       if (!key) throw new Error("Groq API Key is missing.");
       return new ChatGroq({
         apiKey: key,
-        model: "llama-3.1-8b-instant",
+        model: "openai/gpt-oss-120b",
         temperature: 0.1,
       });
     }
@@ -407,8 +415,9 @@ ${strictRules}`;
     instruction?: string,
   ): Promise<{ content: string; tokens: number }> {
     const model = this.createModelInstance(provider, apiKey);
-    const dir = instruction?.trim()
-      ? `\n\n## User direction (prioritize this)\n${instruction.trim()}`
+    const dir =
+      instruction?.trim() ?
+        `\n\n## User direction (prioritize this)\n${instruction.trim()}`
       : "";
     const promptText = `You are an expert technical writer. Improve the following markdown for clarity, grammar, and technical accuracy.${dir}
 
@@ -491,12 +500,13 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const projectManifest = manifestResult.content;
     const technicalTruthMap = technicalTruthMapResult.content;
 
-    const { usesTemplate, prompt: generationPrompt } = this.buildReadmeUserPrompt(
-      analysis,
-      options,
-      projectManifest,
-      technicalTruthMap,
-    );
+    const { usesTemplate, prompt: generationPrompt } =
+      this.buildReadmeUserPrompt(
+        analysis,
+        options,
+        projectManifest,
+        technicalTruthMap,
+      );
 
     const generationResult = await this.callLlm(model, generationPrompt);
     const finalContent = this.cleanLlmOutput(generationResult.content);
@@ -534,22 +544,17 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const { usesTemplate, prompt: streamPrompt } = this.buildReadmeUserPrompt(
       analysis,
       options,
-      (
-        await this.generateProjectManifest(model, context, summary)
-      ).content,
-      (
-        await this.distillProjectEvidence(model, context.evidence, targetTone)
-      ).content,
+      (await this.generateProjectManifest(model, context, summary)).content,
+      (await this.distillProjectEvidence(model, context.evidence, targetTone))
+        .content,
     );
 
     if (!usesTemplate) {
-      yield (
-        this.generateHeader(
-          summary,
-          options.shields || [],
-          options.heroImageUrl,
-        ) + "\n"
-      );
+      yield this.generateHeader(
+        summary,
+        options.shields || [],
+        options.heroImageUrl,
+      ) + "\n";
     }
 
     // We already yielded the header, prevent LLM from generating it again

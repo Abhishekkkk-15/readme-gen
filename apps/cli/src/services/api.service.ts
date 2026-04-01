@@ -18,6 +18,7 @@ export class ApiService {
       sections?: string[];
       generateNested?: boolean;
       manualImportantFiles?: string[];
+      readmeTemplate?: { id?: string; body: string };
     } = {},
   ): Promise<{ content: string; readmes?: { path: string; content: string }[] }> {
     const provider = configManager.get('provider');
@@ -48,6 +49,7 @@ export class ApiService {
           shields: options.shields || ['license', 'stars'],
           generateNested: options.generateNested,
           manualImportantFiles: options.manualImportantFiles,
+          readmeTemplate: options.readmeTemplate,
         },
         {
           headers: {
