@@ -63,7 +63,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, heroImageUrl, manualImportantFiles = [] } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody } = req.body;
     const user = (req as any).user;
 
     const apiKey = req.headers['x-api-key'] as string;
@@ -106,6 +106,13 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const readmeTemplateOpt =
+      readmeTemplate?.body != null && String(readmeTemplate.body).trim()
+        ? { id: readmeTemplate.id as string | undefined, body: String(readmeTemplate.body) }
+        : templateBody != null && String(templateBody).trim()
+          ? { id: templateId as string | undefined, body: String(templateBody) }
+          : undefined;
+
     const result = await llmService.generateReadme(
       finalAnalysis,
       provider === 'gemini' ? 'gemini' : 'groq',
@@ -117,6 +124,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
         apiKey,
         persona,
         heroImageUrl,
+        readmeTemplate: readmeTemplateOpt,
       }
     );
 
@@ -167,7 +175,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
 export const generateStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [] } = req.body;
+    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody } = req.body;
     const user = (req as any).user;
     const apiKey = req.headers['x-api-key'] as string;
 
@@ -205,6 +213,13 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
+    const readmeTemplateStream =
+      readmeTemplate?.body != null && String(readmeTemplate.body).trim()
+        ? { id: readmeTemplate.id as string | undefined, body: String(readmeTemplate.body) }
+        : templateBody != null && String(templateBody).trim()
+          ? { id: templateId as string | undefined, body: String(templateBody) }
+          : undefined;
+
     const stream = llmService.generateReadmeStream(
       finalAnalysis,
       provider === 'gemini' ? 'gemini' : 'groq',
@@ -216,6 +231,7 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
         apiKey,
         persona,
         heroImageUrl,
+        readmeTemplate: readmeTemplateStream,
       }
     );
 
@@ -266,7 +282,7 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
 };
 export const improveSection = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { text, provider } = req.body;
+    const { text, provider, instruction, userInstruction } = req.body;
     const apiKey = req.headers['x-api-key'] as string;
     const user = (req as any).user;
 
@@ -288,10 +304,18 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const improveHint =
+      typeof instruction === 'string'
+        ? instruction
+        : typeof userInstruction === 'string'
+          ? userInstruction
+          : undefined;
+
     const result = await llmService.improveContent(
       text,
       provider === 'gemini' ? 'gemini' : 'groq',
-      apiKey
+      apiKey,
+      improveHint,
     );
 
     if (user) {

@@ -1,6 +1,5 @@
 import { ChatGroq } from "@langchain/groq";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { PromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { config } from "dotenv";
 import {
@@ -13,6 +12,17 @@ import {
 } from "@readme-gen/analyzer";
 
 config();
+
+export type GenerateReadmeOptions = {
+  sections?: string[];
+  tone?: string;
+  shields?: string[];
+  additionalContext?: string;
+  apiKey?: string;
+  persona?: string;
+  heroImageUrl?: string;
+  readmeTemplate?: { id?: string; body: string };
+};
 
 class LLMService {
   constructor() {}
@@ -235,6 +245,111 @@ class LLMService {
     return instructions.join("\n");
   }
 
+  private formatReadmeTemplateSpec(
+    templateMarkdown: string,
+    summary: ProjectSummary,
+  ): string {
+    const year = new Date().getFullYear();
+    const desc = (summary.description || "").replace(/\s+/g, " ").slice(0, 1200);
+    return `## STRUCTURE TEMPLATE
+TEMPLATE_JSON is a JSON-encoded string of the README markdown skeleton you must reproduce structurally.
+
+**Replace placeholders using grounded facts (literal values for this run):**
+- \`{project-name}\` → ${JSON.stringify(summary.name)}
+- \`{description}\` → ${JSON.stringify(desc)}
+- \`{year}\` → ${JSON.stringify(String(year))}
+- \`{author}\` → "Contributors" (or org/repo owner only if explicitly stated in GROUNDING DATA)
+
+**Structural compliance:**
+1. Same \`#\` / \`##\` / \`###\` heading sequence and titles as in the template (after substituting placeholders).
+2. Same markdown table shapes (column count and header cell text).
+3. Same fenced code block languages and ordering where the template shows fences.
+4. Do not add or remove \`##\` sections compared to the template.
+5. Fill prose and tables only from GROUNDING DATA, CODE SURFACE, and ADDITIONAL CONTEXT.
+
+TEMPLATE_JSON:
+${JSON.stringify(templateMarkdown)}
+`;
+  }
+
+  private buildReadmeUserPrompt(
+    analysis: ProjectAnalysis,
+    options: Pick<
+      GenerateReadmeOptions,
+      | "sections"
+      | "tone"
+      | "additionalContext"
+      | "persona"
+      | "readmeTemplate"
+    >,
+    projectManifest: string,
+    technicalTruthMap: string,
+  ): { usesTemplate: boolean; prompt: string } {
+    const { summary, context } = analysis;
+    const targetTone = options.tone || "professional";
+    const personaGuidance = this.getPersonaGuidance(
+      options.persona || "Senior Developer",
+    );
+    const tpl = options.readmeTemplate?.body?.trim();
+    const usesTemplate = Boolean(tpl);
+    const groundingContext = this.buildGroundingContext(summary);
+    const evidenceIndex = this.buildEvidenceIndex(context);
+    const sectionInstructions = usesTemplate
+      ? `## SECTIONS\nUse **only** the STRUCTURE TEMPLATE for which headings exist and their order. Ignore any conflicting free-form section list.`
+      : this.buildSectionPrompt(options.sections);
+    const templateBlock = usesTemplate
+      ? this.formatReadmeTemplateSpec(tpl!, summary)
+      : "";
+    const strictRules = usesTemplate
+      ? `## STRICT RULES:
+- **TEMPLATE STRUCTURE IS LAW**: Mirror TEMPLATE_JSON — heading hierarchy/order/titles (after placeholders), table shapes, fence languages, and section count must match.
+- **GROUNDING**: All factual claims from GROUNDING DATA, CODE SURFACE, or ADDITIONAL CONTEXT only.
+- **EXAMPLES**: Prefer real commands, routes, and identifiers from CODE SURFACE; do not invent HTTP paths or CLI flags.
+- **GAPS**: If a template subsection has no grounded content, one short honest sentence (e.g. not applicable / not detected) — never fabricate.
+- **TONE**: ${targetTone}.
+
+README CONTENT (open exactly as the template does — usually a single \`#\` title line):
+`
+      : `## STRICT RULES:
+- **GROUNDING FIRST**: Every claim must come from the Grounding Data or Additional Context above. Do NOT invent features, dependencies, or commands.
+- **OMIT UNSELECTED SECTIONS**: If a section is not listed in MANDATORY SECTIONS, do NOT generate it.
+- **MENTION DEPENDENCIES**: Reference key dependencies by name when discussing the tech stack.
+- **MENTION ALL ROUTES/ENV VARS**: If API/Env sections are requested, list them all.
+- **REAL EXAMPLES ONLY**: For Usage/Quick Start/API examples, you MUST use real endpoint paths (e.g. \`/api/...\`) and real function/class names from CODE SURFACE. If you can't ground an example, omit it rather than inventing it.
+- **INCORPORATE CONTEXT**: Integrate the 'ADDITIONAL CONTEXT' into the Overview and Architecture sections to explain the "Why" and the business value.
+- **NO PLACEHOLDERS**: Every generated section must be populated with real facts. No "Coming soon" or "TODO".
+- **TONE**: ${targetTone}.
+
+README CONTENT (START WITH #):
+`;
+
+    const prompt = `Generate a comprehensive, enterprise-grade README.md for ${summary.name}.
+
+## PERSONA
+${options.persona || "Senior Developer"}: ${personaGuidance}
+
+## INTELLIGENCE (from code analysis)
+${projectManifest}
+
+## CODE ARTIFACTS INVENTORY
+${technicalTruthMap}
+
+## GROUNDING DATA (YOU MUST USE THESE EXACT FACTS${usesTemplate ? "" : " — DO NOT INVENT"})
+${groundingContext}
+
+## CODE SURFACE (YOU MUST QUOTE THESE VERBATIM WHEN WRITING EXAMPLES)
+${evidenceIndex}
+
+${templateBlock}${sectionInstructions}
+
+## ADDITIONAL CONTEXT (CRITICAL BUSINESS LOGIC / WHY IT EXISTS)
+${options.additionalContext || "No additional context provided."}
+
+${strictRules}`;
+
+    return { usesTemplate, prompt };
+  }
+
   private distillEnvVars(summary: ProjectSummary): string {
     if (!summary.isMonorepo) {
       return `### ⚙️ Environment Configuration\n\`\`\`env\n${(summary.envVars || []).map((v: string) => `${v}=`).join("\n")}\n\`\`\``;
@@ -289,22 +404,23 @@ class LLMService {
     text: string,
     provider: "groq" | "gemini" = "groq",
     apiKey?: string,
+    instruction?: string,
   ): Promise<{ content: string; tokens: number }> {
     const model = this.createModelInstance(provider, apiKey);
-    const improvementTemplate = `You are an expert technical writer. Improve the following markdown content:
-{text}`;
-    const prompt = PromptTemplate.fromTemplate(improvementTemplate);
-    const chain = prompt.pipe(model);
-    const response = (await chain.invoke({ text })) as any;
+    const dir = instruction?.trim()
+      ? `\n\n## User direction (prioritize this)\n${instruction.trim()}`
+      : "";
+    const promptText = `You are an expert technical writer. Improve the following markdown for clarity, grammar, and technical accuracy.${dir}
 
-    const content =
-      typeof response === "string" ? response : (response.content as string);
-    const tokens =
-      (response as any).additional_kwargs?.usage?.total_tokens ||
-      (response as any).usage_metadata?.total_tokens ||
-      Math.ceil(content.length / 4);
+Rules:
+- Output only the improved markdown for the same scope (no preamble).
+- Unless the user direction says otherwise, preserve heading levels and list structure.
+- Preserve code fences and their languages.
 
-    return { content, tokens };
+## Markdown to improve
+
+${text}`;
+    return await this.callLlm(model, promptText);
   }
 
   public async getRecommendations(
@@ -353,23 +469,12 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
   public async generateReadme(
     analysis: ProjectAnalysis,
     provider: "groq" | "gemini" = "groq",
-    options: {
-      sections?: string[];
-      tone?: string;
-      shields?: string[];
-      additionalContext?: string;
-      apiKey?: string;
-      persona?: string;
-      heroImageUrl?: string;
-    } = {},
+    options: GenerateReadmeOptions = {},
   ): Promise<{ content: string; tokens: number }> {
     const model = this.createModelInstance(provider, options.apiKey);
     const { summary, context } = analysis;
-    const refined = SemanticRefiner.refine(summary);
+    SemanticRefiner.refine(summary);
     const targetTone = options.tone || "professional";
-    const personaGuidance = this.getPersonaGuidance(
-      options.persona || "Senior Developer",
-    );
 
     const manifestResult = await this.generateProjectManifest(
       model,
@@ -386,48 +491,23 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const projectManifest = manifestResult.content;
     const technicalTruthMap = technicalTruthMapResult.content;
 
-    const groundingContext = this.buildGroundingContext(summary);
-    const evidenceIndex = this.buildEvidenceIndex(context);
-    const sectionInstructions = this.buildSectionPrompt(options.sections);
-
-    const generationPrompt = `Generate a comprehensive, enterprise-grade README.md for ${summary.name}.
-
-## PERSONA
-${options.persona || "Senior Developer"}: ${personaGuidance}
-
-## INTELLIGENCE (from code analysis)
-${projectManifest}
-
-## CODE ARTIFACTS INVENTORY
-${technicalTruthMap}
-
-## GROUNDING DATA (YOU MUST USE THESE EXACT FACTS)
-${groundingContext}
-
-## CODE SURFACE (YOU MUST QUOTE THESE VERBATIM WHEN WRITING EXAMPLES)
-${evidenceIndex}
-
-${sectionInstructions}
-
-## ADDITIONAL CONTEXT (CRITICAL BUSINESS LOGIC / WHY IT EXISTS)
-${options.additionalContext || "No additional context provided."}
-
-## STRICT RULES:
-- **GROUNDING FIRST**: Every claim must come from the Grounding Data or Additional Context above. Do NOT invent features, dependencies, or commands.
-- **OMIT UNSELECTED SECTIONS**: If a section is not listed in MANDATORY SECTIONS, do NOT generate it.
-- **MENTION DEPENDENCIES**: Reference key dependencies by name when discussing the tech stack.
-- **MENTION ALL ROUTES/ENV VARS**: If API/Env sections are requested, list them all.
-- **REAL EXAMPLES ONLY**: For Usage/Quick Start/API examples, you MUST use real endpoint paths (e.g. \`/api/...\`) and real function/class names from CODE SURFACE. If you can’t ground an example, omit it rather than inventing it.
-- **INCORPORATE CONTEXT**: Integrate the 'ADDITIONAL CONTEXT' into the Overview and Architecture sections to explain the "Why" and the business value.
-- **NO PLACEHOLDERS**: Every generated section must be populated with real facts. No "Coming soon" or "TODO".
-- **TONE**: ${targetTone}.
-
-README CONTENT (START WITH #):
-`;
+    const { usesTemplate, prompt: generationPrompt } = this.buildReadmeUserPrompt(
+      analysis,
+      options,
+      projectManifest,
+      technicalTruthMap,
+    );
 
     const generationResult = await this.callLlm(model, generationPrompt);
     const finalContent = this.cleanLlmOutput(generationResult.content);
     totalTokens += generationResult.tokens;
+
+    if (usesTemplate) {
+      return {
+        content: `${finalContent.trim()}\n`,
+        tokens: totalTokens,
+      };
+    }
 
     const header = this.generateHeader(
       summary,
@@ -445,80 +525,32 @@ README CONTENT (START WITH #):
   public async *generateReadmeStream(
     analysis: ProjectAnalysis,
     provider: "groq" | "gemini" = "groq",
-    options: {
-      sections?: string[];
-      tone?: string;
-      shields?: string[];
-      additionalContext?: string;
-      apiKey?: string;
-      persona?: string;
-      heroImageUrl?: string;
-    } = {},
+    options: GenerateReadmeOptions = {},
   ): AsyncGenerator<string> {
     const model = this.createModelInstance(provider, options.apiKey);
     const { summary, context } = analysis;
     const targetTone = options.tone || "professional";
-    const personaGuidance = this.getPersonaGuidance(
-      options.persona || "Senior Developer",
+
+    const { usesTemplate, prompt: streamPrompt } = this.buildReadmeUserPrompt(
+      analysis,
+      options,
+      (
+        await this.generateProjectManifest(model, context, summary)
+      ).content,
+      (
+        await this.distillProjectEvidence(model, context.evidence, targetTone)
+      ).content,
     );
 
-    yield this.generateHeader(
-      summary,
-      options.shields || [],
-      options.heroImageUrl,
-    ) + "\n";
-
-    const manifestResult = await this.generateProjectManifest(
-      model,
-      context,
-      summary,
-    );
-    const technicalTruthMapResult = await this.distillProjectEvidence(
-      model,
-      context.evidence,
-      targetTone,
-    );
-
-    const projectManifest = manifestResult.content;
-    const technicalTruthMap = technicalTruthMapResult.content;
-
-    const groundingContextStream = this.buildGroundingContext(summary);
-    const evidenceIndex = this.buildEvidenceIndex(context);
-    const sectionInstructionsStream = this.buildSectionPrompt(options.sections);
-
-    const streamPrompt = `Generate a comprehensive, enterprise-grade README.md for ${summary.name}.
-
-## PERSONA
-${options.persona || "Senior Developer"}: ${personaGuidance}
-
-## INTELLIGENCE
-${projectManifest}
-
-## CODE ARTIFACTS
-${technicalTruthMap}
-
-## GROUNDING DATA (USE THESE EXACT FACTS — DO NOT INVENT)
-${groundingContextStream}
-
-## CODE SURFACE (YOU MUST QUOTE THESE VERBATIM WHEN WRITING EXAMPLES)
-${evidenceIndex}
-
-${sectionInstructionsStream}
-
-## ADDITIONAL CONTEXT (CRITICAL BUSINESS LOGIC / WHY IT EXISTS)
-${options.additionalContext || "No additional context provided."}
-
-## STRICT RULES:
-- Every claim MUST come from the Grounding Data or Additional Context. Do NOT hallucinate.
-- OMIT UNSELECTED SECTIONS: If not in MANDATORY SECTIONS, omit it entirely.
-- Document ALL API routes if API section is requested.
-- **REAL EXAMPLES ONLY**: For Usage/Quick Start/API examples, you MUST use real endpoint paths and real function/class names from CODE SURFACE. If you can’t ground an example, omit it rather than inventing it.
-- **INCORPORATE CONTEXT**: Integrate the 'ADDITIONAL CONTEXT' into the Overview and Architecture sections to explain the "Why" and the business value.
-- NO PLACEHOLDERS. NO "Coming soon". NO "TODO".
-- TONE: ${targetTone}.
-
-README CONTENT (START WITH #):
-`;
+    if (!usesTemplate) {
+      yield (
+        this.generateHeader(
+          summary,
+          options.shields || [],
+          options.heroImageUrl,
+        ) + "\n"
+      );
+    }
 
     // We already yielded the header, prevent LLM from generating it again
     const startRegex = new RegExp(
@@ -529,11 +561,14 @@ README CONTENT (START WITH #):
       .pipe(new StringOutputParser())
       .stream(streamPrompt);
     for await (let chunk of stream) {
-      // Very crude way to strip the duplicated # Project Name if it attempts to write it.
-      chunk = chunk.replace(startRegex, "");
+      if (!usesTemplate) {
+        chunk = chunk.replace(startRegex, "");
+      }
       yield chunk;
     }
-    yield "\n\n" + this.distillEnvVars(summary);
+    if (!usesTemplate) {
+      yield "\n\n" + this.distillEnvVars(summary);
+    }
   }
 
   private getPersonaGuidance(persona: string): string {

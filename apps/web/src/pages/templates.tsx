@@ -116,7 +116,7 @@ export function TemplatesPage() {
                 ))}
               </div>
             </CardHeader>
-            <CardFooter className="pt-3 gap-2 border-t mt-auto">
+            <CardFooter className="pt-3 gap-2 border-t mt-auto flex flex-col sm:flex-row">
               <Button 
                 variant="outline" 
                 className="w-full flex-1" 
@@ -125,10 +125,17 @@ export function TemplatesPage() {
                 Preview
               </Button>
               <Button 
+                variant="outline"
                 className="flex-1"
                 onClick={() => applyTemplate(t)}
               >
                 Use layout
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => navigate(`/generate?template=${encodeURIComponent(t.id)}`)}
+              >
+                Generate with AI
               </Button>
             </CardFooter>
           </Card>
@@ -161,12 +168,26 @@ export function TemplatesPage() {
                     {previewTemplate?.description}
                   </DialogDescription>
                 </div>
-                <Button 
-                  size="sm"
-                  onClick={() => previewTemplate && applyTemplate(previewTemplate)}
-                >
-                  Use template
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      previewTemplate &&
+                      navigate(
+                        `/generate?template=${encodeURIComponent(previewTemplate.id)}`,
+                      )
+                    }
+                  >
+                    Generate with AI
+                  </Button>
+                  <Button 
+                    size="sm"
+                    onClick={() => previewTemplate && applyTemplate(previewTemplate)}
+                  >
+                    Use template
+                  </Button>
+                </div>
               </div>
             </DialogHeader>
           </div>

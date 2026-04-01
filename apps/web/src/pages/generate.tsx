@@ -46,6 +46,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/contexts/auth-context'
 import { useWorkspace } from '@/contexts/workspace-context'
 import { mockModels } from '@/data/mock'
+import { readmeTemplates } from '@/data/templates'
 import { consumeDraftRestore } from '@/lib/snapshot-storage'
 import { useReadmeHistory } from '@/hooks/use-readme-history'
 import { cn } from '@/lib/utils'
@@ -119,12 +120,14 @@ export function GeneratePage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const { activeWorkspace } = useWorkspace()
   const [params] = useSearchParams()
+  const templateFromUrl = params.get('template')
   const { resolvedTheme } = useTheme()
 
   const { history, saveSnapshot } = useReadmeHistory(activeWorkspace.id)
 
   const [step, setStep] = useState(() => {
     if (params.get('restored') === '1') return 3
+    if (params.get('step') === '2') return 2
     if (params.get('step') === 'import') return 1
     return 1
   })
@@ -138,6 +141,22 @@ export function GeneratePage() {
       toast.success('Template loaded!')
     }
   }, [])
+
+  useEffect(() => {
+    if (!templateFromUrl) return
+    const t = readmeTemplates.find((x) => x.id === templateFromUrl)
+    if (!t) return
+    setSelectedTemplateId(templateFromUrl)
+    setTone(t.tone)
+    setSections((prev) => {
+      const next = { ...prev }
+      const rec = t.sections as Record<string, boolean>
+      for (const s of sectionOptions) {
+        if (s in rec) next[s] = Boolean(rec[s])
+      }
+      return next
+    })
+  }, [templateFromUrl])
 
   const [repoUrl, setRepoUrl] = useState('')
   const [projectName, setProjectName] = useState('')
@@ -177,9 +196,27 @@ export function GeneratePage() {
   const editorRef = useRef<any>(null)
   const [layoutMode, setLayoutMode] = useState<'split' | 'editor' | 'preview'>('split')
   const [isImproving, setIsImproving] = useState(false)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => params.get('template') || 'none')
+  const [improveInstruction, setImproveInstruction] = useState('')
 
   function handleEditorDidMount(editor: any) {
     editorRef.current = editor
+  }
+
+  function onTemplateSelect(id: string) {
+    setSelectedTemplateId(id)
+    if (id === 'none') return
+    const t = readmeTemplates.find((x) => x.id === id)
+    if (!t) return
+    setTone(t.tone)
+    setSections((prev) => {
+      const next = { ...prev }
+      for (const s of sectionOptions) {
+        const rec = t.sections as Record<string, boolean>
+        if (s in rec) next[s] = Boolean(rec[s])
+      }
+      return next
+    })
   }
 
   function applyFormat(format: string) {
@@ -266,6 +303,7 @@ export function GeneratePage() {
             body: JSON.stringify({
               text,
               provider: modelId.includes('gemini') ? 'gemini' : 'groq',
+              instruction: improveInstruction.trim() || undefined,
             }),
           })
 
@@ -423,12 +461,25 @@ export function GeneratePage() {
 
   async function runGenerate() {
     if (isGenerating) return
+    const hasAnalysis = Boolean(analysis?.summary)
+    const hasRepo = Boolean(repoUrl?.trim())
+    if (!hasAnalysis && !hasRepo) {
+      toast.error('Start on step 1: enter a repository URL and click Fetch (or continue with a URL filled in so the server can analyze it).')
+      setStep(1)
+      return
+    }
+
     setIsGenerating(true)
     setMarkdown('') // Clear before streaming
     setStep(3) // Transition immediately to watch the stream
     
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
     const enabledStr = Object.keys(sections).filter((s) => sections[s])
+    const tpl = readmeTemplates.find((t) => t.id === selectedTemplateId)
+    const readmeTemplate =
+      tpl && selectedTemplateId !== 'none'
+        ? { id: tpl.id, body: tpl.body }
+        : undefined
 
     try {
       const response = await fetch(`${API_URL}/generate/stream`, {
@@ -450,7 +501,8 @@ export function GeneratePage() {
           generateNested: generateNested,
           persona: persona,
           heroImageUrl: heroImageUrl || undefined,
-          manualImportantFiles: manualFiles.split(',').map(f => f.trim()).filter(Boolean)
+          manualImportantFiles: manualFiles.split(',').map(f => f.trim()).filter(Boolean),
+          readmeTemplate,
         }),
       })
 
@@ -655,6 +707,20 @@ export function GeneratePage() {
       ) : null}
 
       {step === 2 ? (
+        <div className="space-y-4">
+          {!analysis?.summary && !repoUrl?.trim() ? (
+            <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm">
+              <span className="font-medium">Add a repository first.</span>{' '}
+              Go to step 1, paste your GitHub URL, and click <strong>Fetch</strong> before generating.
+              <button
+                type="button"
+                className="ml-2 underline underline-offset-2 font-medium text-primary"
+                onClick={() => setStep(1)}
+              >
+                Go to step 1
+              </button>
+            </div>
+          ) : null}
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
@@ -683,7 +749,26 @@ export function GeneratePage() {
                 <CardDescription>AI-driven sections, tone, and shields selection.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                
+                <div className="space-y-2 border-b border-border/40 pb-4">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Layout template</Label>
+                  <Select value={selectedTemplateId} onValueChange={(v) => v && onTemplateSelect(v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Choose template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None — AI picks structure</SelectItem>
+                      {readmeTemplates.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground italic">
+                    With a template, generation follows that layout exactly (headings, tables, code fences) using your repo facts.
+                  </p>
+                </div>
+
                 {/* AI Recommendation Card */}
                 {aiRecommendations && (
                   <div className="bg-primary/5 rounded-xl border border-primary/20 p-4 relative overflow-hidden group">
@@ -830,6 +915,7 @@ export function GeneratePage() {
             </button>
           </div>
         </div>
+        </div>
       ) : null}
 
       {step === 3 ? (
@@ -892,50 +978,56 @@ export function GeneratePage() {
                 )}>
                 {layoutMode !== 'preview' && (
                   <Card className="flex min-h-0 flex-col overflow-hidden">
-                    <CardHeader className="p-2 border-b bg-muted/40 flex flex-row items-center justify-between">
-                      <div className="flex flex-wrap gap-1 items-center overflow-x-auto">
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
-                          className="h-8 gap-1.5 mr-2 bg-primary/10 text-primary hover:bg-primary/20" 
-                          onClick={improveWithAI}
-                          disabled={isImproving}
-                        >
-                          <Sparkles className={cn("size-3.5", isImproving && "animate-pulse")} />
-                          {isImproving ? "Improving..." : "AI Improve"}
-                        </Button>
-                        <div className="w-px h-4 bg-border mr-1" />
-                        
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('bold')}><Bold className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('italic')}><Italic className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('strike')}><Strikethrough className="size-4" /></Button>
-                        <div className="w-px h-4 bg-border mx-1" />
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('h2')}><Heading className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('quote')}><Quote className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('code')}><Code className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('link')}><LinkIcon className="size-4" /></Button>
-                        <div className="w-px h-4 bg-border mx-1" />
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('ul')}><List className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('ol')}><ListOrdered className="size-4" /></Button>
-                      </div>
-                      
-                      <div className="flex gap-1 shrink-0">
-                        <Button 
-                          variant={layoutMode === 'editor' ? 'secondary' : 'ghost'} 
-                          size="icon" className="h-8 w-8 text-muted-foreground" 
-                          onClick={() => setLayoutMode('editor')}
-                          title="Editor only"
-                        >
-                          <Expand className="size-4" />
-                        </Button>
-                        <Button 
-                          variant={layoutMode === 'split' ? 'secondary' : 'ghost'} 
-                          size="icon" className="h-8 w-8 text-muted-foreground" 
-                          onClick={() => setLayoutMode('split')}
-                          title="Split view"
-                        >
-                          <Columns className="size-4" />
-                        </Button>
+                    <CardHeader className="p-2 border-b bg-muted/40 flex flex-col gap-2">
+                      <Textarea
+                        placeholder="AI improve: what should change? (e.g. shorten bullets, more examples, friendlier tone)"
+                        className="text-xs min-h-[52px] w-full resize-y"
+                        value={improveInstruction}
+                        onChange={(e) => setImproveInstruction(e.target.value)}
+                      />
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap gap-1 items-center overflow-x-auto">
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="h-8 gap-1.5 mr-2 bg-primary/10 text-primary hover:bg-primary/20" 
+                            onClick={improveWithAI}
+                            disabled={isImproving}
+                          >
+                            <Sparkles className={cn("size-3.5", isImproving && "animate-pulse")} />
+                            {isImproving ? "Improving..." : "AI Improve"}
+                          </Button>
+                          <div className="w-px h-4 bg-border mr-1" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('bold')}><Bold className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('italic')}><Italic className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('strike')}><Strikethrough className="size-4" /></Button>
+                          <div className="w-px h-4 bg-border mx-1" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('h2')}><Heading className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('quote')}><Quote className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('code')}><Code className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('link')}><LinkIcon className="size-4" /></Button>
+                          <div className="w-px h-4 bg-border mx-1" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('ul')}><List className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('ol')}><ListOrdered className="size-4" /></Button>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button 
+                            variant={layoutMode === 'editor' ? 'secondary' : 'ghost'} 
+                            size="icon" className="h-8 w-8 text-muted-foreground" 
+                            onClick={() => setLayoutMode('editor')}
+                            title="Editor only"
+                          >
+                            <Expand className="size-4" />
+                          </Button>
+                          <Button 
+                            variant={layoutMode === 'split' ? 'secondary' : 'ghost'} 
+                            size="icon" className="h-8 w-8 text-muted-foreground" 
+                            onClick={() => setLayoutMode('split')}
+                            title="Split view"
+                          >
+                            <Columns className="size-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="min-h-0 flex-1 p-0">
