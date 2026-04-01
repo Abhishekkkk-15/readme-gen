@@ -13,6 +13,8 @@
     "@langchain/core": "^1.1.36",
     "@langchain/google-genai": "^2.1.26",
     "@langchain/groq": "^1.1.5",
+    "@langchain/openai": "^1.4.1",
+    "@readme-gen/analyzer": "workspace:*",
     "@types/bcryptjs": "^3.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/jsonwebtoken": "^9.0.10",
@@ -34,8 +36,7 @@
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
-    "passport-local": "^1.0.0",
-    "@readme-gen/analyzer": "workspace:*"
+    "passport-local": "^1.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

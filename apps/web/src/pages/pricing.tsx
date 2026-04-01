@@ -39,7 +39,7 @@ type CustomForm = z.infer<typeof customSchema>
 
 const features = [
   { key: 'READMEs / month', free: '5', pro: 'Unlimited', ent: 'Custom' },
-  { key: 'Models', free: 'Basic', pro: 'All', ent: 'Custom + fine-tunes' },
+  { key: 'Models', free: 'OpenAI / Gemini / Groq', pro: 'OpenAI / Gemini / Groq', ent: 'OpenAI / Gemini / Groq' },
   { key: 'API access', free: '—', pro: 'Included', ent: 'VPC / private' },
   { key: 'Support', free: 'Community', pro: 'Priority', ent: 'Dedicated' },
   { key: 'GitHub push', free: 'Manual', pro: 'OAuth', ent: 'Enterprise SSO' },
@@ -92,7 +92,7 @@ export function PricingPage() {
           highlight
           items={[
             'Unlimited generations',
-            'All models & BYOK',
+            'OpenAI, Gemini, Groq & BYOK',
             'Priority support',
             'Full API access',
             'GitHub OAuth & push',

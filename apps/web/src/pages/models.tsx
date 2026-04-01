@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
+import { ApiKeyManager } from '@/components/api-key-manager'
 import { ModelSelector } from '@/components/model-selector'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -24,11 +25,15 @@ import { mockModels } from '@/data/mock'
 import type { Model } from '@/types'
 import { cn } from '@/lib/utils'
 
-const providers = ['All', 'OpenAI', 'Anthropic', 'Google', 'Local', 'LM Studio', 'Open Source'] as const
+const providers = ['All', 'OpenAI', 'Gemini', 'Groq'] as const
 
 async function fetchModels(): Promise<Model[]> {
   await new Promise((r) => setTimeout(r, 400))
   return mockModels
+}
+
+function getProviderForModel(model: Model): 'OpenAI' | 'Gemini' | 'Groq' {
+  return model.provider as 'OpenAI' | 'Gemini' | 'Groq'
 }
 
 export function ModelsPage() {
@@ -36,6 +41,8 @@ export function ModelsPage() {
   const [q, setQ] = useState('')
   const [testKey, setTestKey] = useState('')
   const [genModel, setGenModel] = useState(mockModels[0]!.id)
+  const [isKeyDialogOpen, setIsKeyDialogOpen] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<'OpenAI' | 'Gemini' | 'Groq'>('OpenAI')
 
   const { data: models = mockModels, isFetching } = useQuery({
     queryKey: ['models'],
@@ -44,7 +51,7 @@ export function ModelsPage() {
 
   const filtered = useMemo(() => {
     return models.filter((m) => {
-      const byProvider = filter === 'All' || m.provider === filter || (filter === 'Local' && m.provider === 'Local')
+      const byProvider = filter === 'All' || m.provider === filter
       const byQ =
         !q.trim() ||
         m.name.toLowerCase().includes(q.toLowerCase()) ||
@@ -127,7 +134,10 @@ export function ModelsPage() {
                   variant="secondary"
                   size="sm"
                   className="w-full"
-                  onClick={() => toast.message(`Open key dialog for ${m.name} (wire to billing in prod)`)}
+                  onClick={() => {
+                    setSelectedProvider(getProviderForModel(m))
+                    setIsKeyDialogOpen(true)
+                  }}
                 >
                   Try with your API key
                 </Button>
@@ -177,6 +187,12 @@ export function ModelsPage() {
       </section>
 
       <section className="mt-16 grid gap-8 lg:grid-cols-2">
+        <ApiKeyManager
+          hideTrigger
+          open={isKeyDialogOpen}
+          onOpenChange={setIsKeyDialogOpen}
+          initialProvider={selectedProvider}
+        />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">

@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 const features = [
   {
     title: 'Multi-model support',
-    desc: 'OpenAI, Anthropic, Google, local LLMs via Ollama & LM Studio.',
+    desc: 'OpenAI, Gemini, and Groq with the same README workflow across web and CLI.',
     icon: Layers,
   },
   {
@@ -75,7 +75,7 @@ const tiers = [
     price: '$9.99',
     period: '/mo',
     blurb: 'For builders and product teams.',
-    items: ['Unlimited READMEs', 'All models', 'Priority support', 'API access'],
+    items: ['Unlimited READMEs', 'OpenAI, Gemini, Groq', 'Priority support', 'API access'],
     href: '/pricing',
     highlight: true,
   },

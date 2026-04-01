@@ -1,10 +1,10 @@
-import { FileCode2, Menu, Moon, Sun, Terminal } from 'lucide-react'
-import { useTheme } from 'next-themes'
-import { Link, NavLink } from 'react-router-dom'
+import { FileCode2, Menu, Moon, Sun, Terminal } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Link, NavLink } from "react-router-dom";
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,21 +12,37 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { useAuth } from '@/contexts/auth-context'
-import { cn } from '@/lib/utils'
+} from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { useAuth } from "@/contexts/auth-context";
+import { cn } from "@/lib/utils";
 
 const nav = [
-  { to: '/templates', label: 'Templates' },
-  { to: '/docs', label: 'Docs' },
-  { to: '/models', label: 'Models' },
-  { to: '/pricing', label: 'Pricing' },
-]
+  { to: "/templates", label: "Templates" },
+  { to: "/docs", label: "Docs" },
+  { to: "/models", label: "Models" },
+  { to: "/pricing", label: "Pricing" },
+];
 
-function NavLinks({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
+function NavLinks({
+  className,
+  onNavigate,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+}) {
   return (
-    <nav className={cn('flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1', className)}>
+    <nav
+      className={cn(
+        "flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1",
+        className,
+      )}>
       {nav.map(({ to, label }) => (
         <NavLink
           key={to}
@@ -34,22 +50,21 @@ function NavLinks({ className, onNavigate }: { className?: string; onNavigate?: 
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              'text-muted-foreground hover:text-foreground rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              isActive && 'bg-accent text-accent-foreground',
+              "text-muted-foreground hover:text-foreground rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              isActive && "bg-accent text-accent-foreground",
             )
-          }
-        >
+          }>
           {label}
         </NavLink>
       ))}
     </nav>
-  )
+  );
 }
 
 export function Navbar() {
-  const { setTheme, resolvedTheme } = useTheme()
-  const { user, isGuest, isAuthenticated, logout } = useAuth()
-  const initial = user?.email?.slice(0, 2).toUpperCase() ?? 'G'
+  const { setTheme, resolvedTheme } = useTheme();
+  const { user, isGuest, isAuthenticated, logout } = useAuth();
+  const initial = user?.email?.slice(0, 2).toUpperCase() ?? "G";
 
   return (
     <header className="bg-background/80 supports-backdrop-filter:bg-background/60 sticky top-0 z-40 border-b backdrop-blur-md">
@@ -58,7 +73,11 @@ export function Navbar() {
           <Sheet>
             <SheetTrigger
               render={
-                <Button variant="ghost" size="icon-sm" className="sm:hidden" aria-label="Open menu">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="sm:hidden"
+                  aria-label="Open menu">
                   <Menu className="size-5" />
                 </Button>
               }
@@ -67,7 +86,7 @@ export function Navbar() {
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   <FileCode2 className="text-primary size-5" />
-                  ReadMe Studio
+                  ReadMe Gen
                 </SheetTitle>
               </SheetHeader>
               <div className="mt-6 flex flex-col gap-4">
@@ -75,36 +94,38 @@ export function Navbar() {
                 <Link
                   to="/docs#cli-installation"
                   className={cn(
-                    buttonVariants({ variant: 'outline', size: 'sm' }),
-                    'inline-flex justify-start gap-2',
-                  )}
-                >
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "inline-flex justify-start gap-2",
+                  )}>
                   <Terminal className="size-4" />
                   Install CLI
                 </Link>
-                {!isAuthenticated ? (
+                {!isAuthenticated ?
                   <Link to="/auth" className={buttonVariants()}>
                     Sign in
                   </Link>
-                ) : (
-                  <>
-                    <Link to="/dashboard" className={buttonVariants({ variant: 'secondary' })}>
+                : <>
+                    <Link
+                      to="/dashboard"
+                      className={buttonVariants({ variant: "secondary" })}>
                       Dashboard
                     </Link>
                     <Link to="/generate" className={buttonVariants()}>
                       Generate
                     </Link>
                   </>
-                )}
+                }
               </div>
             </SheetContent>
           </Sheet>
 
-          <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
+          <Link
+            to="/"
+            className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="bg-primary/15 text-primary inline-flex size-9 items-center justify-center rounded-lg">
               <FileCode2 className="size-5" />
             </span>
-            <span className="hidden sm:inline">ReadMe Studio</span>
+            <span className="hidden sm:inline">ReadMe Gen</span>
           </Link>
 
           <NavLinks className="hidden sm:flex" />
@@ -114,12 +135,11 @@ export function Navbar() {
           <Link
             to="/docs#cli-installation"
             className={cn(
-              buttonVariants({ variant: 'outline', size: 'sm' }),
-              'hidden gap-1.5 font-mono text-xs md:inline-flex',
-            )}
-          >
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "hidden gap-1.5 font-mono text-xs md:inline-flex",
+            )}>
             <Terminal className="size-3.5" />
-            <span className="hidden lg:inline">npm i -g @readme-studio/cli</span>
+            <span className="hidden lg:inline">npm i -g @readme-gen/cli</span>
             <span className="lg:hidden">CLI</span>
           </Link>
 
@@ -127,32 +147,39 @@ export function Navbar() {
             variant="ghost"
             size="icon-sm"
             className="relative"
-            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            aria-label="Toggle color theme"
-          >
+            onClick={() =>
+              setTheme(resolvedTheme === "dark" ? "light" : "dark")
+            }
+            aria-label="Toggle color theme">
             <Sun className="size-4 scale-100 dark:scale-0" />
             <Moon className="absolute size-4 scale-0 dark:scale-100" />
           </Button>
 
-          {!isAuthenticated ? (
-            <Link to="/auth" className={cn(buttonVariants({ size: 'sm' }), 'hidden sm:inline-flex')}>
+          {!isAuthenticated ?
+            <Link
+              to="/auth"
+              className={cn(
+                buttonVariants({ size: "sm" }),
+                "hidden sm:inline-flex",
+              )}>
               Sign in
             </Link>
-          ) : (
-            <DropdownMenu>
+          : <DropdownMenu>
               <DropdownMenuTrigger
                 render={
                   <Button variant="ghost" size="sm" className="gap-2 px-1.5">
                     <Avatar className="size-8">
                       <AvatarFallback className="bg-primary/15 text-primary text-xs">
-                        {initial}
+                        <Link to={"/auth"}>{initial}</Link>
                       </AvatarFallback>
                     </Avatar>
-                    {isGuest ? (
-                      <Badge variant="secondary" className="hidden text-[10px] sm:inline-flex">
+                    {isGuest ?
+                      <Badge
+                        variant="secondary"
+                        className="hidden text-[10px] sm:inline-flex">
                         Guest
                       </Badge>
-                    ) : null}
+                    : null}
                   </Button>
                 }
               />
@@ -160,30 +187,36 @@ export function Navbar() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-foreground text-sm font-medium">
-                      {user?.email ?? 'Guest session'}
+                      {user?.email ?? "Guest session"}
                     </span>
                     <span className="text-muted-foreground text-xs">
-                      {user ? `${user.plan} plan` : 'Limited local preview'}
+                      {user ? `${user.plan} plan` : "Limited local preview"}
                     </span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem render={<Link to="/dashboard" />}>Dashboard</DropdownMenuItem>
-                <DropdownMenuItem render={<Link to="/generate" />}>New README</DropdownMenuItem>
-                {user ? (
-                  <DropdownMenuItem render={<Link to="/auth#keys" />}>API keys</DropdownMenuItem>
-                ) : null}
+                <DropdownMenuItem render={<Link to="/dashboard" />}>
+                  Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem render={<Link to="/generate" />}>
+                  New README
+                </DropdownMenuItem>
+                {user ?
+                  <DropdownMenuItem render={<Link to="/auth#keys" />}>
+                    API keys
+                  </DropdownMenuItem>
+                : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={logout}>
                   Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
+          }
         </div>
       </div>
     </header>
-  )
+  );
 }
 
 function MobileNav() {
@@ -193,11 +226,10 @@ function MobileNav() {
         <Link
           key={to}
           to={to}
-          className="text-muted-foreground hover:bg-accent hover:text-accent-foreground rounded-lg px-3 py-2 text-sm font-medium"
-        >
+          className="text-muted-foreground hover:bg-accent hover:text-accent-foreground rounded-lg px-3 py-2 text-sm font-medium">
           {label}
         </Link>
       ))}
     </nav>
-  )
+  );
 }

@@ -16,13 +16,16 @@ importers:
     dependencies:
       '@langchain/core':
         specifier: ^1.1.36
-        version: 1.1.36(openai@4.104.0(zod@3.25.76))
+        version: 1.1.36(openai@6.33.0(zod@4.3.6))
       '@langchain/google-genai':
         specifier: ^2.1.26
-        version: 2.1.26(@langchain/core@1.1.36(openai@4.104.0(zod@3.25.76)))
+        version: 2.1.26(@langchain/core@1.1.36(openai@6.33.0(zod@4.3.6)))
       '@langchain/groq':
         specifier: ^1.1.5
-        version: 1.1.5(@langchain/core@1.1.36(openai@4.104.0(zod@3.25.76)))
+        version: 1.1.5(@langchain/core@1.1.36(openai@6.33.0(zod@4.3.6)))
+      '@langchain/openai':
+        specifier: ^1.4.1
+        version: 1.4.1(@langchain/core@1.1.36(openai@6.33.0(zod@4.3.6)))
       '@readme-gen/analyzer':
         specifier: workspace:*
         version: link:../../packages/analyzer
@@ -823,6 +826,12 @@ packages:
     engines: {node: '>=20'}
     peerDependencies:
       '@langchain/core': ^1.0.0
+
+  '@langchain/openai@1.4.1':
+    resolution: {integrity: sha512-jaHk4TnLqWrQ1KYmavvwCImW6x8pBy6LLTK73tzSMg7HBLbq0g/l7EkpMcxZWDOvyufuCXUqO2bj47apcOhw6Q==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@langchain/core': ^1.1.38
 
   '@modelcontextprotocol/sdk@1.28.0':
     resolution: {integrity: sha512-gmloF+i+flI8ouQK7MWW4mOwuMh4RePBuPFAEPC6+pdqyWOUMDOixb6qZ69owLJpz6XmyllCouc4t8YWO+E2Nw==}
@@ -3014,12 +3023,12 @@ packages:
     resolution: {integrity: sha512-smsWv2LzFjP03xmvFoJ331ss6h+jixfA4UUV/Bsiyuu4YJPfN+FIQGOIiv4w9/+MoHkfkJ22UIaQWRVFRfH6Vw==}
     engines: {node: '>=20'}
 
-  openai@4.104.0:
-    resolution: {integrity: sha512-p99EFNsA/yX6UhVO93f5kJsDRLAg+CTA2RBqdHK4RtK8u5IJw32Hyb2dTGKbnnFmnuoBv5r7Z2CURI9sGZpSuA==}
+  openai@6.33.0:
+    resolution: {integrity: sha512-xAYN1W3YsDXJWA5F277135YfkEk6H7D3D6vWwRhJ3OEkzRgcyK8z/P5P9Gyi/wB4N8kK9kM5ZjprfvyHagKmpw==}
     hasBin: true
     peerDependencies:
       ws: ^8.18.0
-      zod: ^3.23.8
+      zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       ws:
         optional: true
@@ -4391,7 +4400,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@langchain/core@1.1.36(openai@4.104.0(zod@3.25.76))':
+  '@langchain/core@1.1.36(openai@6.33.0(zod@4.3.6))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       '@standard-schema/spec': 1.1.0
@@ -4399,7 +4408,7 @@ snapshots:
       camelcase: 6.3.0
       decamelize: 1.2.0
       js-tiktoken: 1.0.21
-      langsmith: 0.5.15(openai@4.104.0(zod@3.25.76))
+      langsmith: 0.5.15(openai@6.33.0(zod@4.3.6))
       mustache: 4.2.0
       p-queue: 6.6.2
       uuid: 11.1.0
@@ -4411,18 +4420,27 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/google-genai@2.1.26(@langchain/core@1.1.36(openai@4.104.0(zod@3.25.76)))':
+  '@langchain/google-genai@2.1.26(@langchain/core@1.1.36(openai@6.33.0(zod@4.3.6)))':
     dependencies:
       '@google/generative-ai': 0.24.1
-      '@langchain/core': 1.1.36(openai@4.104.0(zod@3.25.76))
+      '@langchain/core': 1.1.36(openai@6.33.0(zod@4.3.6))
       uuid: 11.1.0
 
-  '@langchain/groq@1.1.5(@langchain/core@1.1.36(openai@4.104.0(zod@3.25.76)))':
+  '@langchain/groq@1.1.5(@langchain/core@1.1.36(openai@6.33.0(zod@4.3.6)))':
     dependencies:
-      '@langchain/core': 1.1.36(openai@4.104.0(zod@3.25.76))
+      '@langchain/core': 1.1.36(openai@6.33.0(zod@4.3.6))
       groq-sdk: 0.37.0
     transitivePeerDependencies:
       - encoding
+
+  '@langchain/openai@1.4.1(@langchain/core@1.1.36(openai@6.33.0(zod@4.3.6)))':
+    dependencies:
+      '@langchain/core': 1.1.36(openai@6.33.0(zod@4.3.6))
+      js-tiktoken: 1.0.21
+      openai: 6.33.0(zod@4.3.6)
+      zod: 4.3.6
+    transitivePeerDependencies:
+      - ws
 
   '@modelcontextprotocol/sdk@1.28.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)':
     dependencies:
@@ -6141,7 +6159,7 @@ snapshots:
 
   kleur@4.1.5: {}
 
-  langsmith@0.5.15(openai@4.104.0(zod@3.25.76)):
+  langsmith@0.5.15(openai@6.33.0(zod@4.3.6)):
     dependencies:
       '@types/uuid': 10.0.0
       chalk: 5.6.2
@@ -6150,7 +6168,7 @@ snapshots:
       semver: 7.7.4
       uuid: 10.0.0
     optionalDependencies:
-      openai: 4.104.0(zod@3.25.76)
+      openai: 6.33.0(zod@4.3.6)
 
   levn@0.4.1:
     dependencies:
@@ -6695,20 +6713,9 @@ snapshots:
       powershell-utils: 0.1.0
       wsl-utils: 0.3.1
 
-  openai@4.104.0(zod@3.25.76):
-    dependencies:
-      '@types/node': 18.19.130
-      '@types/node-fetch': 2.6.13
-      abort-controller: 3.0.0
-      agentkeepalive: 4.6.0
-      form-data-encoder: 1.7.2
-      formdata-node: 4.4.1
-      node-fetch: 2.7.0
+  openai@6.33.0(zod@4.3.6):
     optionalDependencies:
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - encoding
-    optional: true
+      zod: 4.3.6
 
   optionator@0.9.4:
     dependencies:

@@ -3,6 +3,13 @@ import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User';
+import {
+  getProviderLabel,
+  normalizeStoredProvider,
+  removeStoredApiKey,
+  sanitizeUserApiKeys,
+  upsertEncryptedApiKey,
+} from '../utils/api-key-store';
 
 const router = Router();
 
@@ -32,7 +39,7 @@ router.post('/register', async (req, res) => {
     });
 
     const token = signToken(user);
-    res.status(201).json({ token, user });
+    res.status(201).json({ token, user: sanitizeUserApiKeys(user) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -45,7 +52,7 @@ router.post('/login', (req, res, next) => {
     if (!user) return res.status(401).json({ error: info.message });
 
     const token = signToken(user);
-    res.json({ token, user });
+    res.json({ token, user: sanitizeUserApiKeys(user) });
   })(req, res, next);
 });
 
@@ -76,7 +83,52 @@ router.get(
 
 // Get current user
 router.get('/me', passport.authenticate('jwt', { session: false }), (req: any, res) => {
-  res.json(req.user);
+  res.json(sanitizeUserApiKeys(req.user));
+});
+
+router.post('/keys', passport.authenticate('jwt', { session: false }), async (req: any, res) => {
+  try {
+    const provider = normalizeStoredProvider(req.body?.provider);
+    const rawKey = String(req.body?.key || '').trim();
+
+    if (!provider) {
+      return res.status(400).json({ error: 'Valid provider is required' });
+    }
+
+    if (!rawKey) {
+      return res.status(400).json({ error: 'API key is required' });
+    }
+
+    upsertEncryptedApiKey(req.user, provider, rawKey);
+    await req.user.save();
+
+    res.status(200).json({
+      message: `${getProviderLabel(provider)} key saved`,
+      user: sanitizeUserApiKeys(req.user),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to save API key' });
+  }
+});
+
+router.delete('/keys/:provider', passport.authenticate('jwt', { session: false }), async (req: any, res) => {
+  try {
+    const provider = normalizeStoredProvider(req.params.provider);
+
+    if (!provider) {
+      return res.status(400).json({ error: 'Valid provider is required' });
+    }
+
+    removeStoredApiKey(req.user, provider);
+    await req.user.save();
+
+    res.status(200).json({
+      message: `${getProviderLabel(provider)} key removed`,
+      user: sanitizeUserApiKeys(req.user),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to remove API key' });
+  }
 });
 
 export default router;

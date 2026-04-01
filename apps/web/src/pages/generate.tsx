@@ -89,6 +89,13 @@ const languages = [
   { value: 'pt', label: 'Portuguese' },
 ]
 
+function getProviderFromModelId(modelId: string): 'openai' | 'gemini' | 'groq' {
+  const id = modelId.toLowerCase()
+  if (id.includes('gemini')) return 'gemini'
+  if (id.startsWith('gpt')) return 'openai'
+  return 'groq'
+}
+
 function parseSectionOrder(md: string): { id: string; title: string }[] {
   const re = /^## (.+)$/gm
   const out: { id: string; title: string }[] = []
@@ -302,7 +309,7 @@ export function GeneratePage() {
             },
             body: JSON.stringify({
               text,
-              provider: modelId.includes('gemini') ? 'gemini' : 'groq',
+              provider: getProviderFromModelId(modelId),
               instruction: improveInstruction.trim() || undefined,
             }),
           })
@@ -414,7 +421,7 @@ export function GeneratePage() {
         },
         body: JSON.stringify({ 
           analysis: analysisData, // This is already the summary
-          provider: modelId.includes('gemini') ? 'gemini' : 'groq' 
+          provider: getProviderFromModelId(modelId),
         }),
       })
 
@@ -494,7 +501,7 @@ export function GeneratePage() {
           title: projectName || 'Your project',
           description: description || '',
           features: enabledStr,
-          provider: modelId.includes('gemini') ? 'gemini' : 'groq',
+          provider: getProviderFromModelId(modelId),
           repoUrl: repoUrl || undefined,
           analysis: analysis || undefined, // Passing the full {summary, context}
           tone: tone,

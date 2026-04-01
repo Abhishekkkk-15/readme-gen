@@ -1,5 +1,6 @@
 import { ChatGroq } from "@langchain/groq";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatOpenAI } from "@langchain/openai";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { config } from "dotenv";
 import {
@@ -23,6 +24,8 @@ export type GenerateReadmeOptions = {
   heroImageUrl?: string;
   readmeTemplate?: { id?: string; body: string };
 };
+
+export type LlmProvider = "groq" | "gemini" | "openai";
 
 class LLMService {
   constructor() {}
@@ -385,7 +388,7 @@ ${strictRules}`;
   }
 
   private createModelInstance(
-    provider: "groq" | "gemini",
+    provider: LlmProvider,
     apiKey?: string,
   ): any {
     if (provider === "gemini") {
@@ -397,20 +400,31 @@ ${strictRules}`;
         maxRetries: 2,
         temperature: 0.1,
       });
-    } else {
-      const key = apiKey || process.env.GROQ_API_KEY;
-      if (!key) throw new Error("Groq API Key is missing.");
-      return new ChatGroq({
+    }
+
+    if (provider === "openai") {
+      const key = apiKey || process.env.OPENAI_API_KEY;
+      if (!key) throw new Error("OpenAI API Key is missing.");
+      return new ChatOpenAI({
         apiKey: key,
-        model: "openai/gpt-oss-120b",
+        model: "gpt-4o-mini",
+        maxRetries: 2,
         temperature: 0.1,
       });
     }
+
+    const key = apiKey || process.env.GROQ_API_KEY;
+    if (!key) throw new Error("Groq API Key is missing.");
+    return new ChatGroq({
+      apiKey: key,
+      model: "openai/gpt-oss-120b",
+      temperature: 0.1,
+    });
   }
 
   public async improveContent(
     text: string,
-    provider: "groq" | "gemini" = "groq",
+    provider: LlmProvider = "groq",
     apiKey?: string,
     instruction?: string,
   ): Promise<{ content: string; tokens: number }> {
@@ -434,7 +448,7 @@ ${text}`;
 
   public async getRecommendations(
     analysis: any,
-    provider: "groq" | "gemini" = "groq",
+    provider: LlmProvider = "groq",
     apiKey?: string,
   ): Promise<{ sections: string[]; tone: string; reason: string }> {
     const summary = analysis.summary || analysis;
@@ -477,7 +491,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
 
   public async generateReadme(
     analysis: ProjectAnalysis,
-    provider: "groq" | "gemini" = "groq",
+    provider: LlmProvider = "groq",
     options: GenerateReadmeOptions = {},
   ): Promise<{ content: string; tokens: number }> {
     const model = this.createModelInstance(provider, options.apiKey);
@@ -534,7 +548,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
 
   public async *generateReadmeStream(
     analysis: ProjectAnalysis,
-    provider: "groq" | "gemini" = "groq",
+    provider: LlmProvider = "groq",
     options: GenerateReadmeOptions = {},
   ): AsyncGenerator<string> {
     const model = this.createModelInstance(provider, options.apiKey);
@@ -617,7 +631,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
 
   public async generateNestedReadmes(
     analysis: ProjectAnalysis,
-    provider: "groq" | "gemini" = "groq",
+    provider: LlmProvider = "groq",
     options: {
       sections?: string[];
       tone?: string;

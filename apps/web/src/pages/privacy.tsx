@@ -3,9 +3,9 @@ export function PrivacyPage() {
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-semibold tracking-tight">Privacy</h1>
       <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
-        ReadMe Studio is designed so you can bring your own model keys or use hosted inference. This demo stores
-        sessions, workspace settings, and README snapshots only in your browser (localStorage and sessionStorage).
-        Nothing is transmitted to our servers until you connect a real backend.
+        ReadMe Studio supports bring-your-own model keys and hosted inference. Authenticated account data and saved
+        provider keys are handled by the backend; workspace preferences and some draft state may still be cached in
+        the browser for product UX.
       </p>
       <h2 className="mt-10 text-lg font-semibold">Data we process in production (target state)</h2>
       <ul className="text-muted-foreground mt-3 list-inside list-disc space-y-2 text-sm">

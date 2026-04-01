@@ -1,11 +1,34 @@
 import { Request, Response } from 'express';
-import { llmService } from '../services/llm.service';
+import { llmService, type LlmProvider } from '../services/llm.service';
 import Project from '../models/Project';
 import { repoService } from '../services/repo.service';
-import User from '../models/User';
 import { config } from 'dotenv';
+import { getStoredApiKey, markStoredApiKeyUsed } from '../utils/api-key-store';
 
 config();
+
+const normalizeProvider = (value: unknown): LlmProvider => {
+  if (value === 'gemini') return 'gemini';
+  if (value === 'openai') return 'openai';
+  return 'groq';
+};
+
+const resolveApiKey = async (req: Request, provider: LlmProvider) => {
+  const headerKey = req.headers['x-api-key'] as string | undefined;
+  if (headerKey?.trim()) {
+    return headerKey.trim();
+  }
+
+  const user = (req as any).user;
+  if (!user) return undefined;
+
+  const storedKey = getStoredApiKey(user, provider);
+  if (!storedKey) return undefined;
+
+  markStoredApiKeyUsed(user, provider);
+  await user.save();
+  return storedKey;
+};
 
 const checkAndResetUsage = async (user: any) => {
   const now = new Date();
@@ -39,7 +62,8 @@ export const analyzeRepository = async (req: Request, res: Response): Promise<vo
 export const getRecommendations = async (req: Request, res: Response): Promise<void> => {
   try {
     const { analysis, provider } = req.body;
-    const apiKey = req.headers['x-api-key'] as string;
+    const normalizedProvider = normalizeProvider(provider);
+    const apiKey = await resolveApiKey(req, normalizedProvider);
     const user = (req as any).user;
 
     if (!user && !apiKey) {
@@ -50,7 +74,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
     // analysis here could be just summary or full analysis
     const recommendations = await llmService.getRecommendations(
       analysis.summary || analysis,
-      provider === 'gemini' ? 'gemini' : 'groq',
+      normalizedProvider,
       apiKey
     );
 
@@ -65,8 +89,9 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
   try {
     const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody } = req.body;
     const user = (req as any).user;
+    const normalizedProvider = normalizeProvider(provider);
 
-    const apiKey = req.headers['x-api-key'] as string;
+    const apiKey = await resolveApiKey(req, normalizedProvider);
     if (!user && !apiKey) {
       res.status(401).json({ error: 'Unauthorized: No user session or API key provided' });
       return;
@@ -115,7 +140,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
     const result = await llmService.generateReadme(
       finalAnalysis,
-      provider === 'gemini' ? 'gemini' : 'groq',
+      normalizedProvider,
       {
         sections: features,
         tone,
@@ -135,7 +160,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
     if (generateNested && finalAnalysis.summary.tree) {
       readmes = await llmService.generateNestedReadmes(
         finalAnalysis,
-        provider === 'gemini' ? 'gemini' : 'groq',
+        normalizedProvider,
         {
           sections: features,
           tone,
@@ -177,7 +202,8 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
   try {
     const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody } = req.body;
     const user = (req as any).user;
-    const apiKey = req.headers['x-api-key'] as string;
+    const normalizedProvider = normalizeProvider(provider);
+    const apiKey = await resolveApiKey(req, normalizedProvider);
 
     if (!user && !apiKey) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -222,7 +248,7 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
 
     const stream = llmService.generateReadmeStream(
       finalAnalysis,
-      provider === 'gemini' ? 'gemini' : 'groq',
+      normalizedProvider,
       {
         sections: features,
         tone,
@@ -246,7 +272,7 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
     if (generateNested && finalAnalysis.summary.tree) {
       readmes = await llmService.generateNestedReadmes(
         finalAnalysis,
-        provider === 'gemini' ? 'gemini' : 'groq',
+        normalizedProvider,
         { sections: features, tone, shields, additionalContext, apiKey }
       );
       extraTokens = readmes.reduce((acc, r) => acc + r.tokens, 0);
@@ -283,7 +309,8 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
 export const improveSection = async (req: Request, res: Response): Promise<void> => {
   try {
     const { text, provider, instruction, userInstruction } = req.body;
-    const apiKey = req.headers['x-api-key'] as string;
+    const normalizedProvider = normalizeProvider(provider);
+    const apiKey = await resolveApiKey(req, normalizedProvider);
     const user = (req as any).user;
 
     if (!user && !apiKey) {
@@ -313,7 +340,7 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
 
     const result = await llmService.improveContent(
       text,
-      provider === 'gemini' ? 'gemini' : 'groq',
+      normalizedProvider,
       apiKey,
       improveHint,
     );
