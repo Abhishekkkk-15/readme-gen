@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { connectDB } from './config/db';
 import apiRoutes from './routes/api.routes';
 import authRoutes from './routes/auth.routes';
+import billingRoutes from './routes/billing.routes';
 import { configurePassport } from './config/passport';
 
 // Load environment variables
@@ -19,13 +20,18 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  },
+}));
 app.use(cookieParser());
 app.use(passport.initialize());
 
 // Routes
 app.use('/api', apiRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/billing', billingRoutes);
 
 // Base route for health check
 app.get('/health', (req: Request, res: Response) => {

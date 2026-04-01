@@ -13,21 +13,56 @@ const normalizeProvider = (value: unknown): LlmProvider => {
   return 'groq';
 };
 
-const resolveApiKey = async (req: Request, provider: LlmProvider) => {
+const getPlatformApiKey = (provider: LlmProvider) => {
+  if (provider === 'openai') return process.env.OPENAI_API_KEY;
+  if (provider === 'gemini') return process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  return process.env.GROQ_API_KEY;
+};
+
+const resolveExecutionMode = async (
+  req: Request,
+  provider: LlmProvider,
+): Promise<{ apiKey?: string; mode: 'platform' | 'byok' }> => {
+  const requestedMode = req.body?.keyMode;
   const headerKey = req.headers['x-api-key'] as string | undefined;
   if (headerKey?.trim()) {
-    return headerKey.trim();
+    return { apiKey: headerKey.trim(), mode: 'byok' };
   }
 
   const user = (req as any).user;
-  if (!user) return undefined;
+  if (requestedMode === 'platform') {
+    if (!user) {
+      throw new Error('Authentication is required for platform-hosted usage');
+    }
+    if (user.plan !== 'pro') {
+      throw new Error('Upgrade to Pro to use platform-hosted API billing');
+    }
+    if (!getPlatformApiKey(provider)) {
+      throw new Error(`Platform ${provider} credentials are not configured`);
+    }
+    return { mode: 'platform' };
+  }
+
+  if (!user) {
+    return { apiKey: undefined, mode: 'byok' };
+  }
 
   const storedKey = getStoredApiKey(user, provider);
-  if (!storedKey) return undefined;
+  if (!storedKey) {
+    if (requestedMode === 'byok') {
+      throw new Error(`No stored ${provider} API key found for this account`);
+    }
+
+    if (user.plan === 'pro' && getPlatformApiKey(provider)) {
+      return { mode: 'platform' };
+    }
+
+    return { apiKey: undefined, mode: 'byok' };
+  }
 
   markStoredApiKeyUsed(user, provider);
   await user.save();
-  return storedKey;
+  return { apiKey: storedKey, mode: 'byok' };
 };
 
 const checkAndResetUsage = async (user: any) => {
@@ -63,7 +98,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
   try {
     const { analysis, provider } = req.body;
     const normalizedProvider = normalizeProvider(provider);
-    const apiKey = await resolveApiKey(req, normalizedProvider);
+    const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
     const user = (req as any).user;
 
     if (!user && !apiKey) {
@@ -91,7 +126,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
     const user = (req as any).user;
     const normalizedProvider = normalizeProvider(provider);
 
-    const apiKey = await resolveApiKey(req, normalizedProvider);
+    const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
     if (!user && !apiKey) {
       res.status(401).json({ error: 'Unauthorized: No user session or API key provided' });
       return;
@@ -203,7 +238,7 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
     const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody } = req.body;
     const user = (req as any).user;
     const normalizedProvider = normalizeProvider(provider);
-    const apiKey = await resolveApiKey(req, normalizedProvider);
+    const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
 
     if (!user && !apiKey) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -310,7 +345,7 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
   try {
     const { text, provider, instruction, userInstruction } = req.body;
     const normalizedProvider = normalizeProvider(provider);
-    const apiKey = await resolveApiKey(req, normalizedProvider);
+    const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
     const user = (req as any).user;
 
     if (!user && !apiKey) {

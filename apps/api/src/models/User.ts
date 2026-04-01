@@ -8,6 +8,17 @@ export interface IUser extends Document {
   displayName: string;
   avatarUrl?: string;
   plan: 'free' | 'pro';
+  billing?: {
+    provider?: 'razorpay';
+    planCode?: 'pro-monthly' | 'pro-annual';
+    subscriptionId?: string;
+    subscriptionStatus?: string;
+    customerId?: string;
+    currentStartAt?: Date;
+    currentEndAt?: Date;
+    cancelAtCycleEnd?: boolean;
+    lastWebhookEventId?: string;
+  };
   apiKeys: {
     provider: string;
     key: string;
@@ -33,6 +44,17 @@ const UserSchema: Schema = new Schema(
     displayName: { type: String, required: true },
     avatarUrl: { type: String, required: false },
     plan: { type: String, enum: ['free', 'pro'], default: 'free' },
+    billing: {
+      provider: { type: String, enum: ['razorpay'], required: false },
+      planCode: { type: String, enum: ['pro-monthly', 'pro-annual'], required: false },
+      subscriptionId: { type: String, required: false },
+      subscriptionStatus: { type: String, required: false },
+      customerId: { type: String, required: false },
+      currentStartAt: { type: Date, required: false },
+      currentEndAt: { type: Date, required: false },
+      cancelAtCycleEnd: { type: Boolean, default: false },
+      lastWebhookEventId: { type: String, required: false },
+    },
     apiKeys: [
       {
         provider: { type: String },

@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion } from 'framer-motion'
 import { BadgeCheck, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
 
 const customSchema = z.object({
@@ -47,7 +48,11 @@ const features = [
 ]
 
 export function PricingPage() {
+  const navigate = useNavigate()
+  const { user, token, updateUser, refreshUser } = useAuth()
   const [annual, setAnnual] = useState(true)
+  const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
   const form = useForm<CustomForm>({
     resolver: zodResolver(customSchema),
     defaultValues: { company: '', email: '', notes: '' },
@@ -55,6 +60,85 @@ export function PricingPage() {
 
   const proPrice = annual ? 99 : 9.99
   const proLabel = annual ? '/yr' : '/mo'
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  const isPro = user?.plan === 'pro'
+
+  useEffect(() => {
+    if (!token) return
+    void fetch(`${API_URL}/billing/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.user) updateUser(data.user)
+      })
+      .catch(() => {})
+  }, [API_URL, token, updateUser])
+
+  async function startCheckout() {
+    if (!token) {
+      navigate('/auth')
+      return
+    }
+
+    setIsCheckingOut(true)
+    toast.promise(
+      fetch(`${API_URL}/billing/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ planCode: annual ? 'pro-annual' : 'pro-monthly' }),
+      }).then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to start checkout')
+        }
+        if (data.user) updateUser(data.user)
+        if (!data.checkoutUrl) {
+          throw new Error('Missing Razorpay checkout URL')
+        }
+        window.location.href = data.checkoutUrl
+        return 'Redirecting to Razorpay...'
+      }).finally(() => setIsCheckingOut(false)),
+      {
+        loading: 'Starting checkout...',
+        success: (message) => message,
+        error: (err) => err.message || 'Failed to start checkout',
+      },
+    )
+  }
+
+  async function cancelSubscription() {
+    if (!token) return
+
+    setIsCancelling(true)
+    toast.promise(
+      fetch(`${API_URL}/billing/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ cancelAtCycleEnd: true }),
+      }).then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to schedule cancellation')
+        }
+        if (data.user) updateUser(data.user)
+        await refreshUser()
+        return 'Cancellation scheduled for the end of the billing cycle'
+      }).finally(() => setIsCancelling(false)),
+      {
+        loading: 'Updating subscription...',
+        success: (message) => message,
+        error: (err) => err.message || 'Failed to update subscription',
+      },
+    )
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -97,8 +181,9 @@ export function PricingPage() {
             'Full API access',
             'GitHub OAuth & push',
           ]}
-          cta="Upgrade to Pro"
-          href="/auth"
+          cta={isPro ? 'Current plan' : isCheckingOut ? 'Starting checkout...' : 'Upgrade to Pro'}
+          onClick={isPro ? undefined : startCheckout}
+          disabled={isPro || isCheckingOut}
         />
         <PlanCard
           name="Enterprise"
@@ -109,6 +194,41 @@ export function PricingPage() {
           href="#custom"
         />
       </div>
+
+      {user ? (
+        <section className="mt-10">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Subscription</CardTitle>
+              <CardDescription>
+                {user.billing?.subscriptionId
+                  ? `Status: ${user.billing.subscriptionStatus || 'pending'}`
+                  : 'No active Razorpay subscription'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                Current plan: <span className="text-foreground font-medium">{user.plan}</span>
+              </p>
+              {user.billing?.currentEndAt ? (
+                <p className="text-muted-foreground">
+                  Billing period ends {new Date(user.billing.currentEndAt).toLocaleDateString()}
+                </p>
+              ) : null}
+              {isPro && user.billing?.subscriptionId ? (
+                <button
+                  type="button"
+                  className={buttonVariants({ variant: 'outline' })}
+                  disabled={isCancelling || Boolean(user.billing?.cancelAtCycleEnd)}
+                  onClick={cancelSubscription}
+                >
+                  {user.billing?.cancelAtCycleEnd ? 'Cancellation scheduled' : isCancelling ? 'Updating...' : 'Cancel at cycle end'}
+                </button>
+              ) : null}
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm">
         <span className="text-muted-foreground inline-flex items-center gap-2">
@@ -221,6 +341,8 @@ function PlanCard({
   cta,
   href,
   highlight,
+  onClick,
+  disabled,
 }: {
   name: string
   description: string
@@ -228,8 +350,10 @@ function PlanCard({
   period?: string
   items: string[]
   cta: string
-  href: string
+  href?: string
   highlight?: boolean
+  onClick?: () => void
+  disabled?: boolean
 }) {
   const inner = (
     <>
@@ -252,14 +376,25 @@ function PlanCard({
         </ul>
       </CardContent>
       <CardFooter>
-        {href.startsWith('#') ? (
-          <a href={href} className={cn(buttonVariants({ variant: highlight ? 'default' : 'outline' }), 'w-full')}>
-            {cta}
-          </a>
+        {href ? (
+          href.startsWith('#') ? (
+            <a href={href} className={cn(buttonVariants({ variant: highlight ? 'default' : 'outline' }), 'w-full')}>
+              {cta}
+            </a>
+          ) : (
+            <Link to={href} className={cn(buttonVariants({ variant: highlight ? 'default' : 'outline' }), 'w-full')}>
+              {cta}
+            </Link>
+          )
         ) : (
-          <Link to={href} className={cn(buttonVariants({ variant: highlight ? 'default' : 'outline' }), 'w-full')}>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onClick}
+            className={cn(buttonVariants({ variant: highlight ? 'default' : 'outline' }), 'w-full')}
+          >
             {cta}
-          </Link>
+          </button>
         )}
       </CardFooter>
     </>

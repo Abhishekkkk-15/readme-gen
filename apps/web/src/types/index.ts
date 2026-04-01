@@ -1,3 +1,15 @@
+export interface UserBilling {
+  provider?: 'razorpay'
+  planCode?: 'pro-monthly' | 'pro-annual'
+  subscriptionId?: string
+  subscriptionStatus?: string
+  customerId?: string
+  currentStartAt?: string
+  currentEndAt?: string
+  cancelAtCycleEnd?: boolean
+  lastWebhookEventId?: string
+}
+
 export interface User {
   id: string
   email: string
@@ -5,6 +17,7 @@ export interface User {
   avatarUrl?: string
   provider: 'local' | 'google' | 'github'
   plan: 'free' | 'pro'
+  billing?: UserBilling
   apiKeys: {
     provider: string
     key: string

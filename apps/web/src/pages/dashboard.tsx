@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, FilePlus, FolderGit, History, KeyRound } from 'lucide-react'
+import { ArrowRight, FilePlus, FolderGit, History, KeyRound, CreditCard } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 
@@ -132,6 +132,33 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ModelSelector value={prefModel} onChange={setPrefModel} label="Preferred model" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CreditCard className="size-4" />
+              Billing
+            </CardTitle>
+            <CardDescription>
+              {user?.billing?.subscriptionStatus
+                ? `Razorpay subscription ${user.billing.subscriptionStatus}`
+                : 'Upgrade to Pro for hosted API billing'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-muted-foreground">
+              Plan: <span className="text-foreground font-medium">{usageUser.plan}</span>
+            </p>
+            {user?.billing?.currentEndAt ? (
+              <p className="text-muted-foreground">
+                Current cycle ends {new Date(user.billing.currentEndAt).toLocaleDateString()}
+              </p>
+            ) : null}
+            <Link to="/pricing" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Manage billing
+            </Link>
           </CardContent>
         </Card>
 

@@ -26,6 +26,7 @@ type AuthContextValue = {
   enterGuest: () => void
   updateUser: (patch: Partial<User>) => void
   setToken: (token: string) => void
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -126,6 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, ...patch } : null))
   }, [])
 
+  const refreshUser = useCallback(async () => {
+    if (!token) return
+    await fetchUser(token)
+  }, [fetchUser, token])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -141,8 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       enterGuest,
       updateUser,
       setToken,
+      refreshUser,
     }),
-    [user, token, isLoading, isGuest, login, register, loginWithGoogle, loginWithGithub, logout, enterGuest, updateUser, setToken],
+    [user, token, isLoading, isGuest, login, register, loginWithGoogle, loginWithGithub, logout, enterGuest, updateUser, setToken, refreshUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

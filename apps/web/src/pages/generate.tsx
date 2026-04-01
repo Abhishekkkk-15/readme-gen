@@ -123,7 +123,7 @@ function reorderMarkdownBySections(md: string, order: { id: string; title: strin
 }
 
 export function GeneratePage() {
-  const { isAuthenticated, token } = useAuth()
+  const { isAuthenticated, token, user } = useAuth()
   const [isGenerating, setIsGenerating] = useState(false)
   const { activeWorkspace } = useWorkspace()
   const [params] = useSearchParams()
@@ -205,6 +205,12 @@ export function GeneratePage() {
   const [isImproving, setIsImproving] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => params.get('template') || 'none')
   const [improveInstruction, setImproveInstruction] = useState('')
+
+  useEffect(() => {
+    if (user?.plan !== 'pro' && keyMode === 'platform') {
+      setKeyMode('byok')
+    }
+  }, [keyMode, user?.plan])
 
   function handleEditorDidMount(editor: any) {
     editorRef.current = editor
@@ -297,6 +303,11 @@ export function GeneratePage() {
 
     setIsImproving(true)
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+    if (keyMode === 'platform' && user?.plan !== 'pro') {
+      toast.error('Upgrade to Pro to use platform-hosted API billing.')
+      setIsImproving(false)
+      return
+    }
     
     toast.promise(
       async () => {
@@ -310,6 +321,7 @@ export function GeneratePage() {
             body: JSON.stringify({
               text,
               provider: getProviderFromModelId(modelId),
+              keyMode,
               instruction: improveInstruction.trim() || undefined,
             }),
           })
@@ -411,6 +423,11 @@ export function GeneratePage() {
   async function fetchRecommendations(analysisData: any) {
     setIsRecommending(true)
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+    if (keyMode === 'platform' && user?.plan !== 'pro') {
+      toast.error('Upgrade to Pro to use platform-hosted API billing.')
+      setIsRecommending(false)
+      return
+    }
     
     try {
       const res = await fetch(`${API_URL}/recommendations`, {
@@ -422,6 +439,7 @@ export function GeneratePage() {
         body: JSON.stringify({ 
           analysis: analysisData, // This is already the summary
           provider: getProviderFromModelId(modelId),
+          keyMode,
         }),
       })
 
@@ -475,6 +493,11 @@ export function GeneratePage() {
       setStep(1)
       return
     }
+    if (keyMode === 'platform' && user?.plan !== 'pro') {
+      toast.error('Upgrade to Pro to use platform-hosted API billing.')
+      setStep(2)
+      return
+    }
 
     setIsGenerating(true)
     setMarkdown('') // Clear before streaming
@@ -502,6 +525,7 @@ export function GeneratePage() {
           description: description || '',
           features: enabledStr,
           provider: getProviderFromModelId(modelId),
+          keyMode,
           repoUrl: repoUrl || undefined,
           analysis: analysis || undefined, // Passing the full {summary, context}
           tone: tone,
@@ -743,7 +767,7 @@ export function GeneratePage() {
               <ModelSelector value={modelId} onChange={setModelId} />
               <RadioGroup value={keyMode} onValueChange={(v) => setKeyMode(v as 'platform' | 'byok')}>
                 <div className="flex items-center gap-2">
-                  <RadioGroupItem value="platform" id="km-p" />
+                  <RadioGroupItem value="platform" id="km-p" disabled={user?.plan !== 'pro'} />
                   <Label htmlFor="km-p">Use platform API (billing)</Label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -751,6 +775,11 @@ export function GeneratePage() {
                   <Label htmlFor="km-b">Use my API keys</Label>
                 </div>
               </RadioGroup>
+              {user?.plan !== 'pro' ? (
+                <p className="text-xs text-muted-foreground">
+                  Platform-hosted usage requires Pro. Upgrade on the <Link to="/pricing" className="text-primary underline">pricing page</Link>.
+                </p>
+              ) : null}
             </CardContent>
           </Card>
           
