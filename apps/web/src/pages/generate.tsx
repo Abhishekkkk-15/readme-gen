@@ -17,7 +17,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import Editor from '@monaco-editor/react'
 import { useTheme } from 'next-themes'
-import { GripVertical, Link2, Save, Sparkles, Languages, History, Check, X, Bold, Italic, Strikethrough, Link as LinkIcon, List, ListOrdered, Quote, Code, Heading, Columns, Copy, Expand, Laptop } from 'lucide-react'
+import { GripVertical, Link2, Save, Sparkles, Languages, History, Check, X, Bold, Italic, Strikethrough, Link as LinkIcon, List, ListOrdered, Quote, Code, Heading, Columns, Copy, Expand, Laptop, LoaderCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -471,6 +471,8 @@ export function GeneratePage() {
 
     setIsGenerating(true)
     setMarkdown('') // Clear before streaming
+    setGeneratedFiles([])
+    setActiveFilePath('README.md')
     setStep(3) // Transition immediately to watch the stream
     
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
@@ -625,9 +627,12 @@ export function GeneratePage() {
             <button
               key={s}
               type="button"
-              onClick={() => setStep(s)}
+              onClick={() => {
+                if (!isGenerating) setStep(s)
+              }}
+              disabled={isGenerating}
               className={cn(
-                'size-8 rounded-full text-xs font-medium transition-colors',
+                'size-8 rounded-full text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                 step === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80',
               )}
             >
@@ -907,11 +912,18 @@ export function GeneratePage() {
           </div>
           
           <div className="lg:col-span-2 flex justify-between">
-            <button type="button" className={buttonVariants({ variant: 'outline' })} onClick={() => setStep(1)}>
+            <button type="button" className={buttonVariants({ variant: 'outline' })} onClick={() => setStep(1)} disabled={isGenerating}>
               Back
             </button>
-            <button type="button" className={buttonVariants()} onClick={runGenerate}>
-              Generate draft
+            <button type="button" className={buttonVariants()} onClick={runGenerate} disabled={isGenerating}>
+              {isGenerating ? (
+                <>
+                  <LoaderCircle className="size-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                'Generate draft'
+              )}
             </button>
           </div>
         </div>
@@ -920,6 +932,21 @@ export function GeneratePage() {
 
       {step === 3 ? (
         <div className="space-y-4">
+          {isGenerating && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="flex items-center gap-3 p-4">
+                <LoaderCircle className="size-5 animate-spin text-primary" />
+                <div>
+                  <p className="text-sm font-medium">README generation in progress</p>
+                  <p className="text-xs text-muted-foreground">
+                    {markdown.trim()
+                      ? 'Streaming content into the editor and preview.'
+                      : 'Preparing the draft from your repository context and template.'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <Tabs defaultValue="editor" className="w-full">
             <div className="flex justify-between items-center mb-4">
               <TabsList>
@@ -932,18 +959,18 @@ export function GeneratePage() {
               </TabsList>
               
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={saveWork}>
+                <Button variant="secondary" onClick={saveWork} disabled={isGenerating || !markdown.trim()}>
                   <Save className="size-4 mr-2" />
                   Save Version
                 </Button>
-                <Button onClick={() => setStep(4)}>
+                <Button onClick={() => setStep(4)} disabled={isGenerating || !markdown.trim()}>
                   Export options
                 </Button>
               </div>
             </div>
 
             <TabsContent value="editor" className="mt-0">
-              <div className="flex gap-4 min-h-[min(640px,calc(100svh-14rem))]">
+              <div className="relative flex gap-4 min-h-[min(640px,calc(100svh-14rem))]">
                 {generatedFiles.length > 1 && (
                   <Card className="w-48 flex flex-col min-h-0 hidden md:flex shrink-0 border-border">
                     <CardHeader className="p-3 border-b bg-muted/20">
@@ -992,23 +1019,23 @@ export function GeneratePage() {
                             size="sm" 
                             className="h-8 gap-1.5 mr-2 bg-primary/10 text-primary hover:bg-primary/20" 
                             onClick={improveWithAI}
-                            disabled={isImproving}
+                            disabled={isImproving || isGenerating || !markdown.trim()}
                           >
                             <Sparkles className={cn("size-3.5", isImproving && "animate-pulse")} />
                             {isImproving ? "Improving..." : "AI Improve"}
                           </Button>
                           <div className="w-px h-4 bg-border mr-1" />
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('bold')}><Bold className="size-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('italic')}><Italic className="size-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('strike')}><Strikethrough className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('bold')} disabled={isGenerating}><Bold className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('italic')} disabled={isGenerating}><Italic className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('strike')} disabled={isGenerating}><Strikethrough className="size-4" /></Button>
                           <div className="w-px h-4 bg-border mx-1" />
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('h2')}><Heading className="size-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('quote')}><Quote className="size-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('code')}><Code className="size-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('link')}><LinkIcon className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('h2')} disabled={isGenerating}><Heading className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('quote')} disabled={isGenerating}><Quote className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('code')} disabled={isGenerating}><Code className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('link')} disabled={isGenerating}><LinkIcon className="size-4" /></Button>
                           <div className="w-px h-4 bg-border mx-1" />
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('ul')}><List className="size-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('ol')}><ListOrdered className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('ul')} disabled={isGenerating}><List className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => applyFormat('ol')} disabled={isGenerating}><ListOrdered className="size-4" /></Button>
                         </div>
                         <div className="flex gap-1 shrink-0">
                           <Button 
@@ -1038,6 +1065,7 @@ export function GeneratePage() {
                         theme={editorTheme}
                         value={markdown}
                         onChange={(v) => {
+                          if (isGenerating) return
                           setMarkdown(v ?? '')
                           setGeneratedFiles(prev => prev.map(pf => pf.path === activeFilePath ? { ...pf, content: v ?? '' } : pf))
                           // Attempt to update structure as you type
@@ -1089,12 +1117,25 @@ export function GeneratePage() {
                     </CardHeader>
                     <CardContent className={cn("bg-muted/10 min-h-0 flex-1 overflow-auto", layoutMode === 'preview' ? 'p-8 md:p-12 lg:p-16' : 'p-4')}>
                       <div className={cn("mx-auto rounded-xl bg-card shadow-sm p-8", layoutMode === 'preview' ? 'max-w-5xl border-y border-x' : '')}>
-                        <MarkdownPreview content={previewMd} />
+                        {isGenerating && !previewMd.trim() ? (
+                          <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-center">
+                            <LoaderCircle className="size-8 animate-spin text-primary" />
+                            <div>
+                              <p className="text-sm font-medium">Generating README...</p>
+                              <p className="text-xs text-muted-foreground">The first draft will appear here as soon as streaming starts.</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <MarkdownPreview content={previewMd} />
+                        )}
                       </div>
                     </CardContent>
                   </Card>
                 )}
                 </div>
+                {isGenerating && (
+                  <div className="pointer-events-none absolute inset-0 rounded-xl bg-background/35" aria-hidden="true" />
+                )}
               </div>
             </TabsContent>
 

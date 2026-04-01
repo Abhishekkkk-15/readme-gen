@@ -12,6 +12,536 @@ export type ReadmeTemplateWithBody = ReadmeTemplate & {
 
 export const readmeTemplates: ReadmeTemplateWithBody[] = [
   {
+    id: 'go-microservice',
+    name: 'Go microservice',
+    description: 'Go service template with config, health checks, Docker, and operational endpoints.',
+    category: 'backend',
+    tags: ['Go', 'Microservice', 'Docker', 'Backend'],
+    sections: { ...allOn(baseKeys), API: true, Badges: true },
+    tone: 'technical',
+    badges: true,
+    sampleIntro: 'Production-oriented Go service with structured config and observability hooks.',
+    body: `# {project-name}
+
+> {description}
+
+![Go](https://img.shields.io/badge/go-1.22+-00ADD8) ![CI](https://img.shields.io/badge/ci-passing-success) ![License](https://img.shields.io/badge/license-MIT-blue)
+
+## Overview
+
+Describe the service, the problem it solves, and the systems it integrates with.
+
+## Architecture
+
+\`\`\`
+Client -> Load balancer -> {project-name} -> Postgres / Redis / external APIs
+\`\`\`
+
+Document the major request flow and failure boundaries here.
+
+## Installation
+
+\`\`\`bash
+git clone https://github.com/org/{project-name}.git
+cd {project-name}
+go mod tidy
+go build ./...
+\`\`\`
+
+## Configuration
+
+Create a local environment file or export variables before starting the service:
+
+\`\`\`env
+PORT=8080
+DATABASE_URL=postgres://user:pass@localhost:5432/app
+REDIS_URL=redis://localhost:6379
+LOG_LEVEL=info
+\`\`\`
+
+## Usage
+
+\`\`\`bash
+go run ./cmd/server
+\`\`\`
+
+Example health check:
+
+\`\`\`bash
+curl http://localhost:8080/healthz
+\`\`\`
+
+## API Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| \`/healthz\` | GET | Liveness probe |
+| \`/readyz\` | GET | Readiness probe |
+| \`/v1/resources\` | GET | List resources |
+| \`/v1/resources\` | POST | Create a resource |
+
+## Development
+
+\`\`\`bash
+go test ./...
+go vet ./...
+golangci-lint run
+\`\`\`
+
+## Docker
+
+\`\`\`bash
+docker build -t {project-name} .
+docker run --rm -p 8080:8080 --env-file .env {project-name}
+\`\`\`
+
+## Contributing
+
+1. Create a feature branch
+2. Run \`go test ./...\` and \`go vet ./...\`
+3. Open a pull request with implementation notes
+
+## License
+
+MIT (c) {year} {author}
+`,
+  },
+  {
+    id: 'go-library',
+    name: 'Go library',
+    description: 'Package-focused README with install, examples, exported API overview, and versioning notes.',
+    category: 'library',
+    tags: ['Go', 'Library', 'Package', 'OSS'],
+    sections: { ...allOn(baseKeys), API: true, Contributing: true, License: true },
+    tone: 'friendly',
+    badges: true,
+    sampleIntro: 'Reusable Go package with clear examples and stable public APIs.',
+    body: `# {project-name}
+
+> {description}
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/org/{project-name}.svg)](https://pkg.go.dev/github.com/org/{project-name})
+![Go](https://img.shields.io/badge/go-1.22+-00ADD8)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
+## Features
+
+- Small, composable API surface
+- Sensible defaults for common workflows
+- Test coverage for core package behavior
+
+## Installation
+
+\`\`\`bash
+go get github.com/org/{project-name}
+\`\`\`
+
+## Quick start
+
+\`\`\`go
+package main
+
+import (
+  "fmt"
+
+  lib "github.com/org/{project-name}"
+)
+
+func main() {
+  result := lib.New()
+  fmt.Println(result)
+}
+\`\`\`
+
+## Usage
+
+### Basic example
+
+\`\`\`go
+client := lib.New()
+err := client.Run()
+if err != nil {
+  panic(err)
+}
+\`\`\`
+
+### Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| \`Timeout\` | \`time.Duration\` | \`5s\` | Request timeout |
+| \`Logger\` | \`interface\` | \`nil\` | Structured logger |
+| \`RetryCount\` | \`int\` | \`3\` | Retry attempts for transient failures |
+
+## API
+
+Document the most important exported types and functions:
+
+- \`New(...Option) *Client\`
+- \`(*Client).Run() error\`
+- \`WithTimeout(time.Duration) Option\`
+
+Link to [pkg.go.dev](https://pkg.go.dev/github.com/org/{project-name}) for full package documentation.
+
+## Versioning
+
+This project follows semantic versioning. Breaking API changes are released in a new major version.
+
+## Contributing
+
+1. Fork the repository
+2. Run \`go test ./...\`
+3. Keep public API changes documented in this README and package docs
+
+## License
+
+MIT (c) {year} {author}
+`,
+  },
+  {
+    id: 'go-cli',
+    name: 'Go CLI tool',
+    description: 'Single-binary Go CLI template with install methods, command examples, and release flow.',
+    category: 'cli',
+    tags: ['Go', 'CLI', 'Cobra', 'Binary'],
+    sections: { ...allOn(baseKeys) },
+    tone: 'technical',
+    badges: true,
+    sampleIntro: 'Fast Go-based CLI distributed as a single binary.',
+    body: `# {project-name}
+
+> {description}
+
+![Go](https://img.shields.io/badge/go-1.22+-00ADD8) ![Release](https://img.shields.io/github/v/release/org/{project-name}) ![License](https://img.shields.io/badge/license-MIT-blue)
+
+## Installation
+
+### Go install
+
+\`\`\`bash
+go install github.com/org/{project-name}/cmd/{project-name}@latest
+\`\`\`
+
+### Binary release
+
+Download a platform build from [GitHub Releases](https://github.com/org/{project-name}/releases).
+
+\`\`\`bash
+curl -LO https://github.com/org/{project-name}/releases/latest/download/{project-name}_windows_amd64.zip
+\`\`\`
+
+## Usage
+
+\`\`\`
+{project-name} [command] [flags]
+
+Available Commands:
+  init        Create starter configuration
+  run         Execute the main workflow
+  doctor      Validate local environment
+  version     Print build version
+\`\`\`
+
+### Quick start
+
+\`\`\`bash
+{project-name} init
+{project-name} run --config ./{project-name}.yaml
+\`\`\`
+
+## Configuration
+
+\`\`\`yaml
+log_level: info
+output: ./dist
+color: true
+\`\`\`
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| \`init\` | Bootstrap a local config file |
+| \`run\` | Execute the primary command |
+| \`doctor\` | Check dependencies and environment |
+| \`completion\` | Generate shell completions |
+
+## Development
+
+\`\`\`bash
+go test ./...
+go build ./cmd/{project-name}
+\`\`\`
+
+## Release process
+
+Tag a new version and publish binaries with your release pipeline:
+
+\`\`\`bash
+git tag v1.2.0
+git push origin v1.2.0
+\`\`\`
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Run \`go test ./...\` before submitting changes.
+
+## License
+
+MIT (c) {year} {author}
+`,
+  },
+  {
+    id: 'professional-template',
+    name: 'Professional template',
+    description: 'Polished product README for full-stack platforms with architecture, monorepo setup, and deployment details.',
+    category: 'frontend',
+    tags: ['Professional', 'Monorepo', 'Next.js', 'NestJS'],
+    sections: { ...allOn(baseKeys), API: false, Badges: false },
+    tone: 'technical',
+    badges: false,
+    sampleIntro: 'Professional product-style README with architecture, environments, and deployment details.',
+    body: `# CollabFlow
+
+**Collabflow** is a modern collaborative workspace platform designed for teams to manage workspaces, projects, tasks, and real-time collaboration efficiently.  
+It focuses on scalability, real-time updates, and clean architecture using modern web technologies.
+
+<p align="center">
+<img src="https://res.cloudinary.com/dha7ofrer/image/upload/v1767956502/icon_zue5em.svg" alt="logo" width="400">
+</p>
+
+## Demo
+
+https://collabflow.abhishekkkk.in
+
+## Features
+
+- Workspace management for creating and organizing multiple workspaces
+- Project management with user assignment inside each workspace
+- Task management with CRUD operations, activity tracking, and workflow states
+- Real-time processing powered by BullMQ and Redis queues
+- Authentication and authorization with workspace and project level access control
+- Scalable architecture with workers separated from the API layer
+
+## Tech Stack
+
+### Frontend
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- ShadCN UI
+- TanStack Query
+
+### Backend
+
+- NestJS
+- Prisma
+- PostgreSQL (NeonDB)
+- Redis
+
+### Background Jobs
+
+- BullMQ
+- Dedicated worker services
+
+### DevOps & Deployment
+
+- Render (API and workers)
+- Vercel (Frontend)
+
+## Architecture Overview
+
+\`\`\`bash
+User -> Next.js Web App
+        ->
+API (NestJS)
+        ->
+PostgreSQL (NeonDB)
+        ->
+Redis Queue (BullMQ)
+        ->
+Background Workers
+        ->
+Emails / Async Jobs
+\`\`\`
+
+### Key Principles
+
+- API is stateless and horizontally scalable
+- Workers run as independent services
+- Redis is shared between API and workers
+- Background jobs are handled via BullMQ
+- Prisma is centralized via \`@collabflow/db\`
+
+## Monorepo Setup & Installation
+
+Collabflow uses a monorepo workspace architecture to manage frontend, backend, and worker services in a single repository.
+
+### Requirements
+
+- Node.js >= 20
+- pnpm >= 8
+- PostgreSQL
+- Redis
+- Docker (optional, for local DB and Redis)
+
+## Repository Structure
+
+\`\`\`bash
+.
+├── apps/
+│   ├── api/        # Backend API (Nest server)
+│   ├── web/        # Frontend web application (Next.js)
+│   └── workers/    # Background workers (BullMQ / Redis)
+│
+├── packages/
+│   ├── db/         # Database layer (Prisma / ORM / schema)
+│   └── types/      # Shared TypeScript types
+│
+├── node_modules/
+├── .gitignore
+├── docker-compose.yml
+├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+└── turbo.json
+\`\`\`
+
+## Environment Configuration
+
+Each service has its own \`.env\` file.
+
+### Backend (\`apps/api/.env\`)
+
+\`\`\`env
+NEXT_PUBLIC_API_URL=
+NEXTAUTH_SECRET=
+NODE_ENV=
+PORT=
+REDIS_URL=
+RESEND_API_KEY=
+\`\`\`
+
+### Frontend (\`apps/web/.env\`)
+
+\`\`\`env
+NEXT_PUBLIC_API_URL=
+AUTH_URL=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_ID=
+GITHUB_SECRET=
+NEXTAUTH_SECRET=
+RESEND_API_KEY=
+EMAIL_FROM=
+DATABASE_URL=
+NEXT_PUBLIC_BACKEND_URL=
+NEXT_PUBLIC_WORKER_URL=
+\`\`\`
+
+### Worker (\`apps/workers/.env\`)
+
+\`\`\`env
+REDIS_URL=
+RESEND_API_KEY=
+NEXT_PUBLIC_API_URL=
+PORT=
+\`\`\`
+
+### Database (\`packages/db/.env\`)
+
+\`\`\`env
+DATABASE_URL=
+RESEND_API_KEY=
+\`\`\`
+
+## Installation
+
+Clone the repository:
+
+\`\`\`bash
+git clone https://github.com/abhishekkkk.in/collabflow.git
+cd collabflow
+\`\`\`
+
+Install dependencies workspace-wide:
+
+\`\`\`bash
+pnpm install
+\`\`\`
+
+This installs dependencies for all apps and shared packages.
+
+### Database Setup
+
+\`\`\`bash
+pnpm --filter @collabflow/db prisma generate
+pnpm --filter @collabflow/db prisma migrate dev
+\`\`\`
+
+Optional Prisma Studio:
+
+\`\`\`bash
+pnpm --filter @collabflow/db prisma studio
+\`\`\`
+
+## Usage
+
+### Start Services (Development)
+
+\`\`\`bash
+pnpm dev
+\`\`\`
+
+Or start services individually:
+
+\`\`\`bash
+# Backend API
+pnpm --filter api dev
+
+# Frontend
+pnpm --filter web dev
+
+# Workers
+pnpm --filter workers dev
+
+# Shared packages
+pnpm --filter @collabflow/types build
+pnpm --filter @collabflow/db build
+\`\`\`
+
+### Background Workers
+
+\`\`\`bash
+pnpm --filter workers start
+\`\`\`
+
+### Production Build
+
+\`\`\`bash
+pnpm build
+\`\`\`
+
+## Contributing
+
+Use feature branches, keep service boundaries clean, and validate database and worker changes before opening a pull request.
+
+## Authors
+
+- [@abhishekkkk-15](https://www.github.com/abhishekkkk-15)
+- Abhishek Jangid
+- Backend-focused Full Stack Developer
+- LinkedIn: https://www.linkedin.com/in/abhishek-jangid-3532b1323
+
+## License
+
+[MIT](https://choosealicense.com/licenses/mit/)
+`,
+  },
+  {
     id: 'saas-api',
     name: 'SaaS / REST API',
     description: 'OpenAPI-style sections, auth, rate limits, and SDK docs.',
