@@ -104,7 +104,8 @@ export async function runSemanticReadmePipeline(
 
   const chunkTexts = chunks.map(c => c.text);
 
-  // Safe parallelism: intent/features/architecture are independent (LLM #1-3).
+  // Intent/features/architecture are independent. The client may still pace them
+  // sequentially when requestDelayMs is configured to avoid provider TPM spikes.
   const [intent, features, architecture] = await Promise.all([
     analyzeProjectIntent(llm, chunkTexts),
     extractFeatures(llm, chunkTexts),

@@ -24,6 +24,7 @@ export async function generateReadmeSemanticCommand(options: {
   context?: string;
   timeoutMs?: number;
   retries?: number;
+  llmDelayMs?: number;
   maxCharsPerChunk?: number;
   files?: string[];
 }) {
@@ -82,6 +83,7 @@ export async function generateReadmeSemanticCommand(options: {
         model,
         timeoutMs: options.timeoutMs ?? 45_000,
         retries: options.retries ?? 2,
+        requestDelayMs: options.llmDelayMs ?? 0,
         temperature: 0.1,
       },
       maxCharsPerChunk: options.maxCharsPerChunk ?? 24_000,

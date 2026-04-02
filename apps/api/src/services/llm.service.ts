@@ -25,12 +25,43 @@ export type GenerateReadmeOptions = {
   heroImageUrl?: string;
   readmeTemplate?: { id?: string; body: string };
   writeMode?: "overwrite" | "rewrite" | "append";
+  llmDelayMs?: number;
 };
 
 export type LlmProvider = "groq" | "gemini" | "openai";
 
+type LlmCallScheduler = <T>(task: () => Promise<T>) => Promise<T>;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 class LLMService {
   constructor() {}
+
+  private createScheduler(delayMs?: number): LlmCallScheduler {
+    const minDelayMs = Math.max(0, delayMs ?? 0);
+    let queue: Promise<void> = Promise.resolve();
+    let lastCallAt = 0;
+
+    return async <T>(task: () => Promise<T>) => {
+      const scheduled = queue.catch(() => undefined).then(async () => {
+        if (minDelayMs > 0) {
+          const elapsed = Date.now() - lastCallAt;
+          const remaining = minDelayMs - elapsed;
+          if (remaining > 0) {
+            await sleep(remaining);
+          }
+        }
+
+        lastCallAt = Date.now();
+        return await task();
+      });
+
+      queue = scheduled.then(() => undefined, () => undefined);
+      return scheduled;
+    };
+  }
 
   /**
    * Build a comprehensive grounding context from ProjectSummary.
@@ -502,6 +533,7 @@ ${text}`;
     model: any,
     context: ProjectContext,
     summary: ProjectSummary,
+    schedule?: LlmCallScheduler,
   ): Promise<{ content: string; tokens: number }> {
     if (!context?.evidence?.files || context.evidence.files.length === 0)
       return { content: "No deep context found.", tokens: 0 };
@@ -514,7 +546,7 @@ Files: ${JSON.stringify(context.evidence.files.slice(0, 15))}
 4. Key Flows: List 3 main user flows.
 
 Return 1 detailed paragraph "Intelligence Manifest".`;
-    return await this.callLlm(model, evidencePrompt);
+    return await this.callLlm(model, evidencePrompt, schedule);
   }
 
   public async generateReadme(
@@ -530,16 +562,19 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const { summary, context } = analysis;
     SemanticRefiner.refine(summary);
     const targetTone = options.tone || "professional";
+    const schedule = this.createScheduler(options.llmDelayMs);
 
     const manifestResult = await this.generateProjectManifest(
       model,
       context,
       summary,
+      schedule,
     );
     const technicalTruthMapResult = await this.distillProjectEvidence(
       model,
       context.evidence,
       targetTone,
+      schedule,
     );
 
     let totalTokens = manifestResult.tokens + technicalTruthMapResult.tokens;
@@ -554,7 +589,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
         technicalTruthMap,
       );
 
-    const generationResult = await this.callLlm(model, generationPrompt);
+    const generationResult = await this.callLlm(model, generationPrompt, schedule);
     const finalContent = this.cleanLlmOutput(generationResult.content);
     totalTokens += generationResult.tokens;
     const writeMode =
@@ -610,6 +645,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     );
     const { summary, context } = analysis;
     const targetTone = options.tone || "professional";
+    const schedule = this.createScheduler(options.llmDelayMs);
     const writeMode =
       options.writeMode ||
       (summary.existingReadme?.content?.trim() ? "rewrite" : "overwrite");
@@ -617,8 +653,8 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const { usesTemplate, prompt: streamPrompt } = this.buildReadmeUserPrompt(
       analysis,
       options,
-      (await this.generateProjectManifest(model, context, summary)).content,
-      (await this.distillProjectEvidence(model, context.evidence, targetTone))
+      (await this.generateProjectManifest(model, context, summary, schedule)).content,
+      (await this.distillProjectEvidence(model, context.evidence, targetTone, schedule))
         .content,
     );
 
@@ -645,9 +681,9 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
       `^#\\s*${summary.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\n?`,
       "i",
     );
-    const stream = await model
-      .pipe(new StringOutputParser())
-      .stream(streamPrompt);
+    const stream = await schedule<AsyncIterable<string>>(() =>
+      model.pipe(new StringOutputParser()).stream(streamPrompt),
+    );
     for await (let chunk of stream) {
       if (!usesTemplate && writeMode !== "append") {
         chunk = chunk.replace(startRegex, "");
@@ -708,6 +744,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
       additionalContext?: string;
       apiKey?: string;
       modelId?: string;
+      llmDelayMs?: number;
     } = {},
   ): Promise<{ path: string; content: string; tokens: number }[]> {
     const readmes: { path: string; content: string; tokens: number }[] = [];
@@ -733,6 +770,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
       options.modelId,
     );
     const targetTone = options.tone || "professional";
+    const schedule = this.createScheduler(options.llmDelayMs);
 
     for (const dir of nestedDirs) {
       const existingNestedReadme = (summary.nestedReadmes || []).find(
@@ -784,7 +822,7 @@ TONE: ${targetTone}
 
 README CONTENT:
 `;
-      const generationResult = await this.callLlm(model, dirPrompt);
+      const generationResult = await this.callLlm(model, dirPrompt, schedule);
       readmes.push({
         path: `${dir}/README.md`,
         content: this.cleanLlmOutput(generationResult.content),
@@ -807,9 +845,12 @@ README CONTENT:
   private async callLlm(
     model: any,
     prompt: string,
+    schedule?: LlmCallScheduler,
   ): Promise<{ content: string; tokens: number }> {
     try {
-      const response = await model.invoke(prompt);
+      const response = schedule
+        ? await schedule(() => model.invoke(prompt))
+        : await model.invoke(prompt);
       const content =
         typeof response === "string" ? response : (response.content as string);
       const tokens =
@@ -828,6 +869,7 @@ README CONTENT:
     model: any,
     evidence: any,
     tone: string,
+    schedule?: LlmCallScheduler,
   ): Promise<{ content: string; tokens: number }> {
     if (!evidence?.files || evidence.files.length === 0)
       return { content: "No technical assets found.", tokens: 0 };
@@ -850,7 +892,7 @@ TASK:
 Return a 1-2 paragraph "Technical Inventory". Clearly explain WHAT functions and endpoints are available so the generator can write real usage examples.
 BE SPECIFIC. NO PLACEHOLDERS.
 `;
-    return await this.callLlm(model, distillationPrompt);
+    return await this.callLlm(model, distillationPrompt, schedule);
   }
 
   private generateNavbar(summary: ProjectSummary): string {

@@ -34,6 +34,7 @@ program
   .option('--context <text>', 'Extra business context ("why it exists")')
   .option('--timeout-ms <ms>', 'LLM timeout in ms', (v) => Number(v), 45000)
   .option('--retries <n>', 'Retry count for transient LLM errors', (v) => Number(v), 2)
+  .option('--llm-delay-ms <ms>', 'Minimum wait in ms between sequential LLM calls', (v) => Number(v), 0)
   .option('--max-chars <n>', 'Max chars per evidence chunk (~24k ~= 6k tokens)', (v) => Number(v), 24000)
   .option('--mode <mode>', 'Existing README handling: overwrite, rewrite, or append')
   .option('--template <id>', 'Built-in template id for backend generation')

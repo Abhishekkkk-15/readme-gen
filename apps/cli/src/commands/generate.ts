@@ -234,6 +234,7 @@ export async function generateCommand(options: {
   context?: string;
   timeoutMs?: number;
   retries?: number;
+  llmDelayMs?: number;
   maxChars?: number;
   mode?: WriteMode;
 }) {
@@ -269,6 +270,7 @@ export async function generateCommand(options: {
       Boolean(options.context) ||
       typeof options.timeoutMs === 'number' ||
       typeof options.retries === 'number' ||
+      typeof options.llmDelayMs === 'number' ||
       typeof options.maxChars === 'number';
 
     if (options.template && !selectedTemplate) {
@@ -338,6 +340,7 @@ export async function generateCommand(options: {
         manualImportantFiles: manualFiles,
         modelId: options.model,
         readmeTemplate: selectedTemplate ? { id: selectedTemplate.id, body: selectedTemplate.body } : undefined,
+        llmDelayMs: options.llmDelayMs ?? 0,
       });
       spinner.succeed('README generated');
 
@@ -391,6 +394,7 @@ export async function generateCommand(options: {
         model,
         timeoutMs: options.timeoutMs ?? 45_000,
         retries: options.retries ?? 2,
+        requestDelayMs: options.llmDelayMs ?? 0,
         temperature: 0.1,
       },
       maxCharsPerChunk: options.maxChars ?? 24_000,

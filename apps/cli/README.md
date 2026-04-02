@@ -28,6 +28,7 @@ Used by default when you want local analysis plus semantic README generation.
 readmegen generate \
   --provider groq \
   --model llama-3.3-70b-versatile \
+  --llm-delay-ms 30000 \
   --mode rewrite
 ```
 
@@ -46,6 +47,7 @@ readmegen generate \
 - Local codebase analysis with the shared analyzer package
 - Existing README handling: `overwrite`, `rewrite`, `append`
 - Model-aware provider selection
+- Configurable inter-call LLM pacing with `--llm-delay-ms`
 - Token reporting after generation
 - Config-backed API key and model management
 
@@ -76,3 +78,4 @@ GROQ_API_KEY=
 - Semantic local generation reports estimated token usage
 - Backend/API generation reports exact token usage when returned by the API
 - `append` and `rewrite` are semantic-flow features and are intentionally guarded against incompatible template flows
+- If a provider hits TPM limits on a large repo, rerun with `--llm-delay-ms 30000` or higher

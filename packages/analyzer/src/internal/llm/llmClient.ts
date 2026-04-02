@@ -23,6 +23,10 @@ export interface LlmClientOptions {
    * Model name override.
    */
   model?: string;
+  /**
+   * Minimum wait time between outbound LLM requests for a single pipeline run.
+   */
+  requestDelayMs?: number;
 }
 
 export class LlmError extends Error {
@@ -36,6 +40,11 @@ export class LlmError extends Error {
     this.status = opts.status;
     this.retriable = Boolean(opts.retriable);
   }
+}
+
+function previewText(text: string, max = 220) {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
 }
 
 function sleep(ms: number) {
@@ -66,6 +75,9 @@ export class LlmClient {
   private readonly timeoutMs: number;
   private readonly retries: number;
   private readonly model?: string;
+  private readonly requestDelayMs: number;
+  private requestQueue: Promise<void> = Promise.resolve();
+  private lastRequestAt = 0;
 
   constructor(opts: LlmClientOptions) {
     this.provider = opts.provider;
@@ -74,13 +86,16 @@ export class LlmClient {
     this.timeoutMs = opts.timeoutMs ?? 45_000;
     this.retries = opts.retries ?? 2;
     this.model = opts.model;
+    this.requestDelayMs = Math.max(0, opts.requestDelayMs ?? 0);
   }
 
   public async generateText(prompt: string): Promise<string> {
-    return this.callWithRetry(async (signal) => {
-      if (this.provider === 'groq') return await this.callGroq(prompt, signal);
-      return await this.callGemini(prompt, signal);
-    });
+    return this.scheduleRequest(() =>
+      this.callWithRetry(async (signal) => {
+        if (this.provider === 'groq') return await this.callGroq(prompt, signal);
+        return await this.callGemini(prompt, signal);
+      }),
+    );
   }
 
   public async generateJson<T>(prompt: string, options: GenerateJsonOptions): Promise<T> {
@@ -93,8 +108,20 @@ export class LlmClient {
     ].join('\n');
 
     const raw = await this.generateText(jsonPrompt);
-    const parsed = this.safeJsonParse(raw);
-    return parsed as T;
+    try {
+      const parsed = this.safeJsonParse(raw);
+      return parsed as T;
+    } catch (err: any) {
+      const hint =
+        this.requestDelayMs > 0
+          ? `Current requestDelayMs=${this.requestDelayMs}.`
+          : 'Try adding a delay between LLM calls (for CLI: --llm-delay-ms 30000).';
+      throw new LlmError(
+        this.provider,
+        `Model returned invalid JSON. This often happens when a response is truncated or a provider rate-limit message leaks into the output. ${hint} Response preview: ${previewText(raw)}`,
+        { retriable: false },
+      );
+    }
   }
 
   private safeJsonParse(text: string): unknown {
@@ -132,6 +159,25 @@ export class LlmClient {
       }
     }
     throw lastErr instanceof Error ? lastErr : new Error('LLM call failed');
+  }
+
+  private async scheduleRequest<T>(task: () => Promise<T>): Promise<T> {
+    const run = async () => {
+      if (this.requestDelayMs > 0) {
+        const elapsed = Date.now() - this.lastRequestAt;
+        const remaining = this.requestDelayMs - elapsed;
+        if (remaining > 0) {
+          await sleep(remaining);
+        }
+      }
+
+      this.lastRequestAt = Date.now();
+      return await task();
+    };
+
+    const scheduled = this.requestQueue.catch(() => undefined).then(run);
+    this.requestQueue = scheduled.then(() => undefined, () => undefined);
+    return scheduled;
   }
 
   /**

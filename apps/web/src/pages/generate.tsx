@@ -181,6 +181,7 @@ export function GeneratePage() {
   const [persona, setPersona] = useState<string>('Senior Developer')
   const [manualFiles, setManualFiles] = useState('')
   const [heroImageUrl, setHeroImageUrl] = useState('')
+  const [llmDelayMs, setLlmDelayMs] = useState('0')
   
   const [markdown, setMarkdown] = useState(defaultMd)
   const [sectionOrder, setSectionOrder] = useState(() => parseSectionOrder(defaultMd))
@@ -551,6 +552,7 @@ export function GeneratePage() {
           generateNested: generateNested,
           persona: persona,
           heroImageUrl: heroImageUrl || undefined,
+          llmDelayMs: Math.max(0, Number(llmDelayMs) || 0),
           manualImportantFiles: manualFiles.split(',').map(f => f.trim()).filter(Boolean),
           readmeTemplate,
         }),
@@ -997,6 +999,22 @@ export function GeneratePage() {
                         {s}
                       </label>
                     ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2 border-t border-border/40">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">LLM pacing</Label>
+                  <div className="space-y-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={llmDelayMs}
+                      onChange={(e) => setLlmDelayMs(e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Minimum wait in milliseconds between LLM calls during generation. Increase this for large repos if your provider hits TPM limits.
+                    </p>
                   </div>
                 </div>
 

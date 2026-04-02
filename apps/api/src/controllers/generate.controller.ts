@@ -128,7 +128,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody, writeMode, modelId } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody, writeMode, modelId, llmDelayMs } = req.body;
     const user = (req as any).user;
     const normalizedProvider = normalizeProvider(provider);
 
@@ -193,6 +193,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
         heroImageUrl,
         readmeTemplate: readmeTemplateOpt,
         writeMode,
+        llmDelayMs,
       }
     );
 
@@ -209,7 +210,8 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
           tone,
           shields,
           additionalContext,
-          apiKey
+          apiKey,
+          llmDelayMs,
         }
       );
       totalTokens += readmes.reduce((acc, r) => acc + r.tokens, 0);
@@ -256,7 +258,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
 export const generateStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody, writeMode, modelId } = req.body;
+    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody, writeMode, modelId, llmDelayMs } = req.body;
     const user = (req as any).user;
     const normalizedProvider = normalizeProvider(provider);
     const { apiKey, mode } = await resolveExecutionMode(req, normalizedProvider);
@@ -316,6 +318,7 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
         heroImageUrl,
         readmeTemplate: readmeTemplateStream,
         writeMode,
+        llmDelayMs,
       }
     );
 
@@ -331,7 +334,7 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
       readmes = await llmService.generateNestedReadmes(
         finalAnalysis,
         normalizedProvider,
-        { sections: features, tone, shields, additionalContext, apiKey }
+        { sections: features, tone, shields, additionalContext, apiKey, llmDelayMs }
       );
       extraTokens = readmes.reduce((acc, r) => acc + r.tokens, 0);
     }

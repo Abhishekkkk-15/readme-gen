@@ -20,6 +20,7 @@ export class ApiService {
       manualImportantFiles?: string[];
       readmeTemplate?: { id?: string; body: string };
       modelId?: string;
+      llmDelayMs?: number;
     } = {},
   ): Promise<{
     content: string;
@@ -60,6 +61,7 @@ export class ApiService {
           generateNested: options.generateNested,
           manualImportantFiles: options.manualImportantFiles,
           readmeTemplate: options.readmeTemplate,
+          llmDelayMs: options.llmDelayMs,
         },
         {
           headers: {
