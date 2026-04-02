@@ -83,6 +83,17 @@ export interface ReadmeGenerationInput {
    */
   sections?: string[];
   /**
+   * Existing root README content, if detected.
+   */
+  existingReadme?: {
+    path: string;
+    content: string;
+  };
+  /**
+   * How generation should handle an existing README.
+   */
+  writeMode?: 'overwrite' | 'rewrite' | 'append';
+  /**
    * Project name (from package metadata).
    */
   projectName: string;

@@ -35,6 +35,10 @@ export interface PipelineOptions {
    * If provided, generator must include ONLY these sections.
    */
   sections?: string[];
+  /**
+   * How to handle an existing README when one is present.
+   */
+  writeMode?: 'overwrite' | 'rewrite' | 'append';
 }
 
 export interface PipelineResult {
@@ -129,6 +133,10 @@ export async function runSemanticReadmePipeline(
     tone: options.tone,
     persona: options.persona,
     sections: options.sections,
+    existingReadme: analysis.summary.existingReadme,
+    writeMode:
+      options.writeMode ||
+      (analysis.summary.existingReadme?.content?.trim() ? 'rewrite' : 'overwrite'),
     projectName: analysis.summary.name,
     projectDescription: analysis.summary.description,
   };

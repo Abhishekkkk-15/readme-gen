@@ -205,6 +205,8 @@ export function GeneratePage() {
   const [isImproving, setIsImproving] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => params.get('template') || 'none')
   const [improveInstruction, setImproveInstruction] = useState('')
+  const [generationError, setGenerationError] = useState<string | null>(null)
+  const [writeMode, setWriteMode] = useState<'overwrite' | 'rewrite' | 'append'>('rewrite')
 
   useEffect(() => {
     if (user?.plan !== 'pro' && keyMode === 'platform') {
@@ -321,6 +323,7 @@ export function GeneratePage() {
             body: JSON.stringify({
               text,
               provider: getProviderFromModelId(modelId),
+              modelId,
               keyMode,
               instruction: improveInstruction.trim() || undefined,
             }),
@@ -439,6 +442,7 @@ export function GeneratePage() {
         body: JSON.stringify({ 
           analysis: analysisData, // This is already the summary
           provider: getProviderFromModelId(modelId),
+          modelId,
           keyMode,
         }),
       })
@@ -498,8 +502,13 @@ export function GeneratePage() {
       setStep(2)
       return
     }
+    if (writeMode === 'append' && selectedTemplateId !== 'none') {
+      toast.error('Append mode is not supported with layout templates. Choose "No template" or switch to rewrite/overwrite.')
+      return
+    }
 
     setIsGenerating(true)
+    setGenerationError(null)
     setMarkdown('') // Clear before streaming
     setGeneratedFiles([])
     setActiveFilePath('README.md')
@@ -525,12 +534,14 @@ export function GeneratePage() {
           description: description || '',
           features: enabledStr,
           provider: getProviderFromModelId(modelId),
+          modelId,
           keyMode,
           repoUrl: repoUrl || undefined,
           analysis: analysis || undefined, // Passing the full {summary, context}
           tone: tone,
           shields: shields,
           additionalContext: additionalContext,
+          writeMode,
           generateNested: generateNested,
           persona: persona,
           heroImageUrl: heroImageUrl || undefined,
@@ -550,48 +561,68 @@ export function GeneratePage() {
       if (!reader) throw new Error('No reader available')
 
       let accumulatedMd = ''
+      let eventBuffer = ''
+      let streamError: string | null = null
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
+        eventBuffer += decoder.decode(value, { stream: true })
+        const events = eventBuffer.split('\n\n')
+        eventBuffer = events.pop() || ''
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6))
-              
-              if (data.chunk) {
-                accumulatedMd += data.chunk
-                setMarkdown(accumulatedMd)
-                // Update section order periodically or at end
-              }
+        for (const rawEvent of events) {
+          const dataLines = rawEvent
+            .split('\n')
+            .filter((line) => line.startsWith('data: '))
+            .map((line) => line.slice(6))
 
-              if (data.done) {
-                setMarkdown(data.content)
-                setSectionOrder(parseSectionOrder(data.content))
-                if (data.readmes) {
-                  setGeneratedFiles([{ path: 'README.md', content: data.content }, ...data.readmes])
-                } else {
-                  setGeneratedFiles([{ path: 'README.md', content: data.content }])
-                }
-                toast.success('README generation complete!')
-              }
+          if (dataLines.length === 0) continue
 
-              if (data.error) {
-                throw new Error(data.error)
-              }
-            } catch (e) {
-              // Ignore partial JSON or heartbeats
+          const payload = dataLines.join('\n').trim()
+          if (!payload) continue
+
+          let data: any
+          try {
+            data = JSON.parse(payload)
+          } catch {
+            continue
+          }
+
+          if (data.error) {
+            streamError = String(data.error)
+            break
+          }
+
+          if (data.chunk) {
+            accumulatedMd += data.chunk
+            setMarkdown(accumulatedMd)
+          }
+
+          if (data.done) {
+            setMarkdown(data.content)
+            setSectionOrder(parseSectionOrder(data.content))
+            if (data.readmes) {
+              setGeneratedFiles([{ path: 'README.md', content: data.content }, ...data.readmes])
+            } else {
+              setGeneratedFiles([{ path: 'README.md', content: data.content }])
             }
+            toast.success('README generation complete!')
           }
         }
+
+        if (streamError) break
+      }
+
+      if (streamError) {
+        throw new Error(streamError)
       }
     } catch (err: any) {
       console.error('Streaming error:', err)
-      toast.error(err.message || 'Error during stream generation')
+      const message = err?.message || 'Error during stream generation'
+      setGenerationError(message)
+      toast.error(message)
       setStep(2) // Go back on error
     } finally {
       setIsGenerating(false)
@@ -894,6 +925,39 @@ export function GeneratePage() {
 
                 <div className="space-y-4 pt-2 border-t border-border/40">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Advanced Options</Label>
+                  <div className="space-y-3">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Existing README handling</Label>
+                    <RadioGroup
+                      value={writeMode}
+                      onValueChange={(value) => setWriteMode(value as 'overwrite' | 'rewrite' | 'append')}
+                      className="grid gap-2"
+                    >
+                      <label className="flex items-start gap-3 rounded-lg border border-border/60 p-3 text-sm cursor-pointer hover:border-primary/50">
+                        <RadioGroupItem value="rewrite" id="mode-rewrite" className="mt-0.5" />
+                        <div>
+                          <Label htmlFor="mode-rewrite" className="cursor-pointer font-medium">Rewrite existing README</Label>
+                          <p className="text-xs text-muted-foreground">Recommended. Preserve good sections and improve stale content using repo facts.</p>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-3 rounded-lg border border-border/60 p-3 text-sm cursor-pointer hover:border-primary/50">
+                        <RadioGroupItem value="append" id="mode-append" className="mt-0.5" />
+                        <div>
+                          <Label htmlFor="mode-append" className="cursor-pointer font-medium">Append net-new sections</Label>
+                          <p className="text-xs text-muted-foreground">Adds grounded sections below the current README without replacing existing copy.</p>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-3 rounded-lg border border-border/60 p-3 text-sm cursor-pointer hover:border-primary/50">
+                        <RadioGroupItem value="overwrite" id="mode-overwrite" className="mt-0.5" />
+                        <div>
+                          <Label htmlFor="mode-overwrite" className="cursor-pointer font-medium">Overwrite from scratch</Label>
+                          <p className="text-xs text-muted-foreground">Generate a fresh draft using repo evidence without trying to preserve current wording.</p>
+                        </div>
+                      </label>
+                    </RadioGroup>
+                    {writeMode === 'append' && selectedTemplateId !== 'none' ? (
+                      <p className="text-[10px] text-amber-600">Append mode does not work with layout templates. Switch template to "none" or choose rewrite/overwrite.</p>
+                    ) : null}
+                  </div>
                   <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-primary transition-colors">
                     <Checkbox
                       checked={generateNested}
@@ -968,6 +1032,14 @@ export function GeneratePage() {
 
       {step === 3 ? (
         <div className="space-y-4">
+          {generationError && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardContent className="p-4">
+                <p className="text-sm font-medium text-destructive">README generation failed</p>
+                <p className="mt-1 text-sm text-muted-foreground">{generationError}</p>
+              </CardContent>
+            </Card>
+          )}
           {isGenerating && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="flex items-center gap-3 p-4">

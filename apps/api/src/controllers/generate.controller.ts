@@ -96,7 +96,7 @@ export const analyzeRepository = async (req: Request, res: Response): Promise<vo
 
 export const getRecommendations = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { analysis, provider } = req.body;
+    const { analysis, provider, modelId } = req.body;
     const normalizedProvider = normalizeProvider(provider);
     const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
     const user = (req as any).user;
@@ -110,7 +110,8 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
     const recommendations = await llmService.getRecommendations(
       analysis.summary || analysis,
       normalizedProvider,
-      apiKey
+      apiKey,
+      modelId,
     );
 
     res.status(200).json(recommendations);
@@ -122,7 +123,7 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 
 export const generateReadme = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody } = req.body;
+    const { title, description, features, provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody, writeMode, modelId } = req.body;
     const user = (req as any).user;
     const normalizedProvider = normalizeProvider(provider);
 
@@ -182,9 +183,11 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
         shields,
         additionalContext,
         apiKey,
+        modelId,
         persona,
         heroImageUrl,
         readmeTemplate: readmeTemplateOpt,
+        writeMode,
       }
     );
 
@@ -235,7 +238,7 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
 
 export const generateStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody } = req.body;
+    const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody, writeMode, modelId } = req.body;
     const user = (req as any).user;
     const normalizedProvider = normalizeProvider(provider);
     const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
@@ -290,9 +293,11 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
         shields,
         additionalContext,
         apiKey,
+        modelId,
         persona,
         heroImageUrl,
         readmeTemplate: readmeTemplateStream,
+        writeMode,
       }
     );
 
@@ -343,7 +348,7 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
 };
 export const improveSection = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { text, provider, instruction, userInstruction } = req.body;
+    const { text, provider, instruction, userInstruction, modelId } = req.body;
     const normalizedProvider = normalizeProvider(provider);
     const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
     const user = (req as any).user;
@@ -378,6 +383,7 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
       normalizedProvider,
       apiKey,
       improveHint,
+      modelId,
     );
 
     if (user) {

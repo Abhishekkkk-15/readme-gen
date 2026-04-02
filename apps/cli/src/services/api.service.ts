@@ -19,6 +19,7 @@ export class ApiService {
       generateNested?: boolean;
       manualImportantFiles?: string[];
       readmeTemplate?: { id?: string; body: string };
+      modelId?: string;
     } = {},
   ): Promise<{ content: string; readmes?: { path: string; content: string }[] }> {
     const provider = configManager.get('provider');
@@ -43,6 +44,7 @@ export class ApiService {
           description: analysis.summary.description,
           features: options.sections || analysis.summary.features,
           provider: backendProvider,
+          modelId: options.modelId,
           analysis,
           tone: options.tone || 'professional',
           persona: options.persona || 'Senior Developer',

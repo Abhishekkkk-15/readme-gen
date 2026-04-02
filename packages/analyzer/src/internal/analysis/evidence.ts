@@ -104,6 +104,20 @@ function renderExamples(summary: ProjectSummary): EvidenceBlock | null {
   };
 }
 
+function renderExistingReadme(summary: ProjectSummary): EvidenceBlock | null {
+  const existing = summary.existingReadme?.content?.trim();
+  if (!existing) return null;
+  return {
+    title: 'Existing README',
+    text: [
+      '## EXISTING README',
+      `Path: ${summary.existingReadme?.path}`,
+      'Treat this as prior repository knowledge: preserve accurate product framing, workflows, and terminology, but prefer code evidence when facts conflict.',
+      mdCodeBlock('md', existing.slice(0, 12000)),
+    ].join('\n'),
+  };
+}
+
 export interface ExtractionEvidence {
   blocks: EvidenceBlock[];
   /**
@@ -121,6 +135,7 @@ export function buildSemanticEvidence(analysis: ProjectAnalysis): ExtractionEvid
 
   const blocks: (EvidenceBlock | null)[] = [
     renderTechClues(summary),
+    renderExistingReadme(summary),
     renderScripts(summary),
     renderEnv(summary),
     renderRoutes(summary),

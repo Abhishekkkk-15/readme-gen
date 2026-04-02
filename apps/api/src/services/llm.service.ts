@@ -20,9 +20,11 @@ export type GenerateReadmeOptions = {
   shields?: string[];
   additionalContext?: string;
   apiKey?: string;
+  modelId?: string;
   persona?: string;
   heroImageUrl?: string;
   readmeTemplate?: { id?: string; body: string };
+  writeMode?: "overwrite" | "rewrite" | "append";
 };
 
 export type LlmProvider = "groq" | "gemini" | "openai";
@@ -293,7 +295,12 @@ ${JSON.stringify(templateMarkdown)}
     analysis: ProjectAnalysis,
     options: Pick<
       GenerateReadmeOptions,
-      "sections" | "tone" | "additionalContext" | "persona" | "readmeTemplate"
+      | "sections"
+      | "tone"
+      | "additionalContext"
+      | "persona"
+      | "readmeTemplate"
+      | "writeMode"
     >,
     projectManifest: string,
     technicalTruthMap: string,
@@ -305,6 +312,9 @@ ${JSON.stringify(templateMarkdown)}
     );
     const tpl = options.readmeTemplate?.body?.trim();
     const usesTemplate = Boolean(tpl);
+    const writeMode =
+      options.writeMode ||
+      (summary.existingReadme?.content?.trim() ? "rewrite" : "overwrite");
     const groundingContext = this.buildGroundingContext(
       summary,
       options.sections,
@@ -316,20 +326,29 @@ ${JSON.stringify(templateMarkdown)}
       : this.buildSectionPrompt(options.sections);
     const templateBlock =
       usesTemplate ? this.formatReadmeTemplateSpec(tpl!, summary) : "";
+    const outputInstruction =
+      writeMode === "append" ?
+        `README CONTENT (APPEND-ONLY: return ONLY new markdown to append to the existing README. Start with a \`##\` heading and avoid repeating existing sections):`
+      : usesTemplate ?
+        `README CONTENT (open exactly as the template does - usually a single \`#\` title line):`
+      : `README CONTENT (START WITH #):`;
     const strictRules =
       usesTemplate ?
         `## STRICT RULES:
-- **TEMPLATE STRUCTURE IS LAW**: Mirror TEMPLATE_JSON — heading hierarchy/order/titles (after placeholders), table shapes, fence languages, and section count must match.
+- **TEMPLATE STRUCTURE IS LAW**: Mirror TEMPLATE_JSON - heading hierarchy/order/titles (after placeholders), table shapes, fence languages, and section count must match.
 - **GROUNDING**: All factual claims from GROUNDING DATA, CODE SURFACE, or ADDITIONAL CONTEXT only.
 - **EXAMPLES**: Prefer real commands, routes, and identifiers from CODE SURFACE; do not invent HTTP paths or CLI flags.
-- **GAPS**: If a template subsection has no grounded content, one short honest sentence (e.g. not applicable / not detected) — never fabricate.
+- **GAPS**: If a template subsection has no grounded content, one short honest sentence (e.g. not applicable / not detected) - never fabricate.
+- **EXISTING README MODE**: ${writeMode}. Append mode is not compatible with template generation.
 - **TONE**: ${targetTone}.
 
-README CONTENT (open exactly as the template does — usually a single \`#\` title line):
+${outputInstruction}
 `
       : `## STRICT RULES:
 - **GROUNDING FIRST**: Every claim must come from the Grounding Data or Additional Context above. Do NOT invent features, dependencies, or commands.
-- **EXISTING README HANDLING**: If an EXISTING README is provided, treat this task as a rewrite/update pass. Reuse valuable structure and wording where it is still accurate, but fix stale, weak, or generic sections using the grounded facts.
+- **EXISTING README MODE**: ${writeMode}.
+- **EXISTING README HANDLING**: If an EXISTING README is provided and mode is \`rewrite\`, treat this task as a rewrite/update pass. Reuse valuable structure and wording where it is still accurate, but fix stale, weak, or generic sections using the grounded facts.
+- **APPEND MODE**: If mode is \`append\`, return ONLY net-new markdown to append. Do not repeat the title, badges, overview, or sections that already exist unless you are extending them with grounded new information.
 - **OMIT UNSELECTED SECTIONS**: If a section is not listed in MANDATORY SECTIONS, do NOT generate it.
 - **MENTION DEPENDENCIES**: Reference key dependencies by name when discussing the tech stack.
 - **MENTION ALL ROUTES/ENV VARS**: If API/Env sections are requested, list them all.
@@ -338,9 +357,8 @@ README CONTENT (open exactly as the template does — usually a single \`#\` tit
 - **NO PLACEHOLDERS**: Every generated section must be populated with real facts. No "Coming soon" or "TODO".
 - **TONE**: ${targetTone}.
 
-README CONTENT (START WITH #):
+${outputInstruction}
 `;
-
     const prompt = `Generate a comprehensive, enterprise-grade README.md for ${summary.name}.
 
 ## PERSONA
@@ -352,7 +370,7 @@ ${projectManifest}
 ## CODE ARTIFACTS INVENTORY
 ${technicalTruthMap}
 
-## GROUNDING DATA (YOU MUST USE THESE EXACT FACTS${usesTemplate ? "" : " — DO NOT INVENT"})
+## GROUNDING DATA (YOU MUST USE THESE EXACT FACTS${usesTemplate ? "" : " - DO NOT INVENT"})
 ${groundingContext}
 
 ## CODE SURFACE (YOU MUST QUOTE THESE VERBATIM WHEN WRITING EXAMPLES)
@@ -397,13 +415,14 @@ ${strictRules}`;
   private createModelInstance(
     provider: LlmProvider,
     apiKey?: string,
+    modelId?: string,
   ): any {
     if (provider === "gemini") {
       const key = apiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
       if (!key) throw new Error("Gemini API Key is missing.");
       return new ChatGoogleGenerativeAI({
         apiKey: key,
-        model: "gemini-2.5-flash",
+        model: modelId || "gemini-2.5-flash",
         maxRetries: 2,
         temperature: 0.1,
       });
@@ -414,7 +433,7 @@ ${strictRules}`;
       if (!key) throw new Error("OpenAI API Key is missing.");
       return new ChatOpenAI({
         apiKey: key,
-        model: "gpt-4o-mini",
+        model: modelId || "gpt-4o-mini",
         maxRetries: 2,
         temperature: 0.1,
       });
@@ -424,7 +443,7 @@ ${strictRules}`;
     if (!key) throw new Error("Groq API Key is missing.");
     return new ChatGroq({
       apiKey: key,
-      model: "openai/gpt-oss-120b",
+      model: modelId || "llama-3.3-70b-versatile",
       temperature: 0.1,
     });
   }
@@ -434,8 +453,9 @@ ${strictRules}`;
     provider: LlmProvider = "groq",
     apiKey?: string,
     instruction?: string,
+    modelId?: string,
   ): Promise<{ content: string; tokens: number }> {
-    const model = this.createModelInstance(provider, apiKey);
+    const model = this.createModelInstance(provider, apiKey, modelId);
     const dir =
       instruction?.trim() ?
         `\n\n## User direction (prioritize this)\n${instruction.trim()}`
@@ -457,9 +477,10 @@ ${text}`;
     analysis: any,
     provider: LlmProvider = "groq",
     apiKey?: string,
+    modelId?: string,
   ): Promise<{ sections: string[]; tone: string; reason: string }> {
     const summary = analysis.summary || analysis;
-    const model = this.createModelInstance(provider, apiKey);
+    const model = this.createModelInstance(provider, apiKey, modelId);
     const recommendationPrompt = `Suggest README sections for: ${summary.name}. JSON output only.`;
     const response = await model
       .pipe(new StringOutputParser())
@@ -501,7 +522,11 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     provider: LlmProvider = "groq",
     options: GenerateReadmeOptions = {},
   ): Promise<{ content: string; tokens: number }> {
-    const model = this.createModelInstance(provider, options.apiKey);
+    const model = this.createModelInstance(
+      provider,
+      options.apiKey,
+      options.modelId,
+    );
     const { summary, context } = analysis;
     SemanticRefiner.refine(summary);
     const targetTone = options.tone || "professional";
@@ -532,10 +557,30 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     const generationResult = await this.callLlm(model, generationPrompt);
     const finalContent = this.cleanLlmOutput(generationResult.content);
     totalTokens += generationResult.tokens;
+    const writeMode =
+      options.writeMode ||
+      (summary.existingReadme?.content?.trim() ? "rewrite" : "overwrite");
+
+    if (options.readmeTemplate?.body?.trim() && writeMode === "append") {
+      throw new Error(
+        "Append mode is not supported when a layout template is selected.",
+      );
+    }
 
     if (usesTemplate) {
       return {
         content: `${finalContent.trim()}\n`,
+        tokens: totalTokens,
+      };
+    }
+
+    if (writeMode === "append") {
+      const existing = summary.existingReadme?.content?.trim();
+      return {
+        content:
+          existing ?
+            `${existing}\n\n${finalContent.trim()}\n`
+          : `${finalContent.trim()}\n`,
         tokens: totalTokens,
       };
     }
@@ -558,9 +603,16 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
     provider: LlmProvider = "groq",
     options: GenerateReadmeOptions = {},
   ): AsyncGenerator<string> {
-    const model = this.createModelInstance(provider, options.apiKey);
+    const model = this.createModelInstance(
+      provider,
+      options.apiKey,
+      options.modelId,
+    );
     const { summary, context } = analysis;
     const targetTone = options.tone || "professional";
+    const writeMode =
+      options.writeMode ||
+      (summary.existingReadme?.content?.trim() ? "rewrite" : "overwrite");
 
     const { usesTemplate, prompt: streamPrompt } = this.buildReadmeUserPrompt(
       analysis,
@@ -570,7 +622,17 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
         .content,
     );
 
-    if (!usesTemplate) {
+    if (usesTemplate && writeMode === "append") {
+      throw new Error(
+        "Append mode is not supported when a layout template is selected.",
+      );
+    }
+
+    if (writeMode === "append" && summary.existingReadme?.content?.trim()) {
+      yield `${summary.existingReadme.content.trim()}\n\n`;
+    }
+
+    if (!usesTemplate && writeMode !== "append") {
       yield this.generateHeader(
         summary,
         options.shields || [],
@@ -587,12 +649,12 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
       .pipe(new StringOutputParser())
       .stream(streamPrompt);
     for await (let chunk of stream) {
-      if (!usesTemplate) {
+      if (!usesTemplate && writeMode !== "append") {
         chunk = chunk.replace(startRegex, "");
       }
       yield chunk;
     }
-    if (!usesTemplate) {
+    if (!usesTemplate && writeMode !== "append") {
       yield "\n\n" + this.distillEnvVars(summary);
     }
   }
@@ -645,6 +707,7 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
       shields?: string[];
       additionalContext?: string;
       apiKey?: string;
+      modelId?: string;
     } = {},
   ): Promise<{ path: string; content: string; tokens: number }[]> {
     const readmes: { path: string; content: string; tokens: number }[] = [];
@@ -664,7 +727,11 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
 
     if (nestedDirs.length === 0) return readmes;
 
-    const model = this.createModelInstance(provider, options.apiKey);
+    const model = this.createModelInstance(
+      provider,
+      options.apiKey,
+      options.modelId,
+    );
     const targetTone = options.tone || "professional";
 
     for (const dir of nestedDirs) {
@@ -691,14 +758,14 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
 
       const dirRole = dir.includes("apps/") ? "Application" : "Package/Library";
       const existingReadmeBlock =
-        existingNestedReadme?.content?.trim()
-          ? `Existing sub-project README (${existingNestedReadme.path}):
+        existingNestedReadme?.content?.trim() ?
+          `Existing sub-project README (${existingNestedReadme.path}):
 \`\`\`md
 ${existingNestedReadme.content.trim().slice(0, 12000)}
 \`\`\`
 
 `
-          : "";
+        : "";
       const dirPrompt = `Generate a dedicated README.md for a sub-project in a monorepo.
 Sub-project Directory: ${dir}
 Type: ${dirRole}

@@ -203,21 +203,22 @@ This repo includes a **multi-stage README generation pipeline** that **never gen
 
 ### CLI usage
 
-The semantic pipeline is exposed via the CLI command:
+The semantic pipeline is exposed via `generate`:
 
 ```bash
 # Build CLI first (monorepo)
 pnpm --filter @readme-gen/cli build
 
 # Run from your target project directory
-devcon generate-readme --provider groq --output README.md
+devcon generate --provider groq --output README.md
 
 # With a hero screenshot + business context (n8n-style)
-devcon generate-readme \
+devcon generate \
   --provider gemini \
   --hero "https://your-domain.com/screenshot.png" \
   --context "Explain what problem this solves and who uses it." \
-  --tone professional
+  --tone professional \
+  --mode rewrite
 ```
 
 ### Required keys

@@ -3,7 +3,6 @@
 import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
 import { generateCommand } from './commands/generate.js';
-import { generateReadmeSemanticCommand } from './commands/generate-readme.js';
 import { previewCommand } from './commands/preview.js';
 import {
   configViewCommand,
@@ -28,8 +27,16 @@ program
 program
   .command('generate')
   .description('Analyze the current project and generate a README.md')
-  .option('-t, --tone <tone>', 'Set the README tone (professional, friendly, minimal, enterprise, …)')
-  .option('--template <id>', 'Built-in template id for API-backed generation')
+  .option('-t, --tone <tone>', 'Set the README tone (professional, friendly, minimal, enterprise, etc.)')
+  .option('-p, --provider <provider>', 'Semantic provider (groq, gemini); defaults from config')
+  .option('-m, --model <id>', 'Model id (e.g. gemini-2.5-flash, llama-3.3-70b-versatile)')
+  .option('--hero <url>', 'Hero screenshot/banner image URL')
+  .option('--context <text>', 'Extra business context ("why it exists")')
+  .option('--timeout-ms <ms>', 'LLM timeout in ms', (v) => Number(v), 45000)
+  .option('--retries <n>', 'Retry count for transient LLM errors', (v) => Number(v), 2)
+  .option('--max-chars <n>', 'Max chars per evidence chunk (~24k ~= 6k tokens)', (v) => Number(v), 24000)
+  .option('--mode <mode>', 'Existing README handling: overwrite, rewrite, or append')
+  .option('--template <id>', 'Built-in template id for backend generation')
   .option(
     '--persona <persona>',
     `Author voice (same as web UI). One of: Senior Developer | Startup Founder | Educational/Beginner | Open Source Contributor`,
@@ -40,26 +47,6 @@ program
   .option('-n, --nested', 'Generate nested READMEs for sub-directories (Monorepos)')
   .option('-f, --files <paths...>', 'Manually specify important files for deeper analysis')
   .action(generateCommand);
-
-program
-  .command('generate-readme')
-  .description('Generate a production-grade README via the semantic JSON pipeline (no raw-code README generation)')
-  .option('-p, --provider <provider>', 'LLM provider (groq, gemini); defaults to gemini if CLI provider is gemini')
-  .option('-m, --model <id>', 'Model id (e.g. gemini-2.5-flash, gemini-2.0-flash, llama-3.3-70b-versatile)')
-  .option('-o, --output <file>', 'Output filename', 'README.md')
-  .option('-t, --tone <tone>', 'Tone (professional, friendly, minimal, enterprise)', 'professional')
-  .option(
-    '--persona <persona>',
-    `Author voice (web parity). E.g. "${DEFAULT_PERSONA}"`,
-    DEFAULT_PERSONA,
-  )
-  .option('--hero <url>', 'Hero screenshot/banner image URL')
-  .option('--context <text>', 'Extra business context ("why it exists")')
-  .option('--timeout-ms <ms>', 'LLM timeout in ms', (v) => Number(v), 45000)
-  .option('--retries <n>', 'Retry count for transient LLM errors', (v) => Number(v), 2)
-  .option('--max-chars <n>', 'Max chars per evidence chunk (~24k ≈ 6k tokens)', (v) => Number(v), 24000)
-  .option('-f, --files <paths...>', 'Manually specify important files for deeper analysis')
-  .action(generateReadmeSemanticCommand);
 
 program
   .command('preview')

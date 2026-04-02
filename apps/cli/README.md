@@ -37,7 +37,7 @@ npm install @readme-gen/cli
 ### Example 1: Generating a README file
 
 ```bash
-npx @readme-gen/cli generate-readme --tone=friendly --persona=developer
+npx @readme-gen/cli generate --tone=friendly --persona="Senior Developer" --mode=rewrite
 ```
 
 This command will generate a README file with a friendly tone and a developer persona.
@@ -119,11 +119,11 @@ The following API endpoints are used in @readme-gen/cli:
 | GET | `provider` | src/commands/init.ts |
 | GET | `model` | src/commands/init.ts |
 | GET | `provider` | src/commands/generate.ts |
-| GET | `provider` | src/commands/generate-readme.ts |
-| GET | `geminiKey` | src/commands/generate-readme.ts |
-| GET | `openaiKey` | src/commands/generate-readme.ts |
-| GET | `groqKey` | src/commands/generate-readme.ts |
-| GET | `model` | src/commands/generate-readme.ts |
+| GET | `provider` | src/commands/generate.ts |
+| GET | `geminiKey` | src/commands/generate.ts |
+| GET | `openaiKey` | src/commands/generate.ts |
+| GET | `groqKey` | src/commands/generate.ts |
+| GET | `model` | src/commands/generate.ts |
 
 ## Environment Variables
 
@@ -139,7 +139,7 @@ GROQ_API_KEY=your_value_here
 The following code patterns are used in @readme-gen/cli:
 
 * CLI Tool found in: src/index.ts, src/index.ts, src/index.ts, src/index.ts, src/index.ts
-* Environment Configuration found in: src/commands/generate-readme.ts, src/commands/generate-readme.ts, src/commands/generate-readme.ts, src/commands/generate-readme.ts, src/commands/generate-readme.ts
+* Environment Configuration found in: src/commands/generate.ts, src/commands/generate.ts, src/commands/generate.ts, src/commands/generate.ts, src/commands/generate.ts
 
 ## Code Surface
 
@@ -154,7 +154,7 @@ The following code surface is used in @readme-gen/cli:
 * src/commands/preview.ts
 * src/commands/init.ts
 * src/commands/generate.ts
-* src/commands/generate-readme.ts
+* src/commands/generate.ts
 
 Note: The code surface is a verbatim representation of the code artifacts in the project.
 

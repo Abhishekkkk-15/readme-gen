@@ -53,5 +53,5 @@ export async function initCommand() {
     configManager.set('geminiKey', answers.apiKey);
   }
 
-  console.log(chalk.green('\n✅ Configuration complete! You can now run "readmegen generate" or "readmegen generate-readme".\n'));
+  console.log(chalk.green('\nConfiguration complete. You can now run "readmegen generate".\n'));
 }
