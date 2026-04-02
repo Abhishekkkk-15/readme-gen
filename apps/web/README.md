@@ -1,76 +1,84 @@
 # web
 
-This is a web application sub-project within the `readme-gen-workspace` monorepo. It serves as a dedicated frontend interface for users to interact with the system.
+Frontend application for `readme-gen`.
 
-## Installation
+This app provides the main product UI for importing repositories, generating README files, editing markdown, viewing token usage, and managing account-level generation workflows.
 
-To install and run the web application, follow these steps:
+## Responsibilities
 
-```bash
-# Clone the monorepo
-git clone https://github.com/your-username/readme-gen-workspace.git
+- Import repositories from GitHub by URL
+- Configure model, tone, template, and README handling mode
+- Stream generated README content into the editor and preview
+- Support AI-assisted section improvement
+- Show generation token usage and billing mode
+- Expose dashboard, history, pricing, templates, docs, and models pages
 
-# Navigate to the web application directory
-cd apps/web
+## Main Areas
 
-# Install dependencies
-pnpm install
-
-# Start the development server
-pnpm run dev
-
-# Open your web browser and navigate to http://localhost:5173 to view the application
+```text
+src/
+|- components/   UI building blocks, layout, preview, insights
+|- contexts/     auth and workspace state
+|- data/         mock data and template definitions
+|- hooks/        history, shortcuts, typing effects
+|- lib/          markdown analysis, snapshot storage, helpers
+|- pages/        generate, dashboard, auth, pricing, docs, templates
 ```
 
-## Running the Application
+## Key Features
 
-To run the web application in development mode, use the following command:
+### Generator UI
+
+The generator page supports:
+
+- repository import and analysis
+- model selection
+- template selection
+- `overwrite`, `rewrite`, and `append` README modes
+- nested README generation
+- streaming output
+- inline markdown editing with Monaco
+- AI improve for selected sections
+
+### Dashboard
+
+The dashboard surfaces:
+
+- recent README generations
+- token usage
+- platform vs BYOK execution details
+- saved project history
+- billing and API key management shortcuts
+
+### History and snapshots
+
+The web app stores local editor snapshots with metadata such as:
+
+- model ID
+- tokens used
+- execution mode (`platform` or `byok`)
+
+## Development
+
+From the workspace root:
 
 ```bash
-cd apps/web && pnpm run dev
+pnpm --filter web dev
+pnpm --filter web build
+pnpm --filter web preview
+pnpm --filter web exec tsc --noEmit
 ```
 
-To build the application for production, use the following command:
+## Environment
 
-```bash
-cd apps/web && pnpm run build
+Typical frontend configuration:
+
+```env
+VITE_API_URL=http://localhost:5000/api
 ```
 
-To lint the application code, use the following command:
+## Notes
 
-```bash
-cd apps/web && pnpm run lint
-```
-
-To preview the application in a browser, use the following command:
-
-```bash
-cd apps/web && pnpm run preview
-```
-
-## Core Dependencies
-
-The web application relies on the following core dependencies:
-
-* `@vitejs/plugin-react` for React support
-* `react` for building user interfaces
-* `react-dom` for rendering React components to the DOM
-* `typescript` for type checking and code generation
-* `eslint` for code linting and formatting
-
-## Purpose and Role
-
-The web application serves as the primary interface for users to interact with the system. It provides a user-friendly interface for users to perform various tasks, such as viewing data, creating new records, and editing existing ones. The application is built using React and TypeScript, and is designed to be scalable and maintainable.
-
-## Development and Testing
-
-The web application is developed and tested using a variety of tools and techniques, including:
-
-* `pnpm` for package management
-* `vite` for development and build processes
-* `eslint` for code linting and formatting
-* `jest` for unit testing and integration testing
-
-## Contributing
-
-Contributions to the web application are welcome and encouraged. If you would like to contribute to the project, please fork the repository and submit a pull request with your changes.
+- The app assumes the backend API is running and reachable through `VITE_API_URL`
+- Auth state is stored client-side and logout currently clears local session state
+- Recent README activity depends on API persistence through MongoDB
