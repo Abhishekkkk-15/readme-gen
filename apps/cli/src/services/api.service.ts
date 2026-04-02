@@ -21,7 +21,15 @@ export class ApiService {
       readmeTemplate?: { id?: string; body: string };
       modelId?: string;
     } = {},
-  ): Promise<{ content: string; readmes?: { path: string; content: string }[] }> {
+  ): Promise<{
+    content: string;
+    readmes?: { path: string; content: string }[];
+    meta?: {
+      tokensUsed?: number;
+      executionMode?: 'platform' | 'byok';
+      modelId?: string | null;
+    };
+  }> {
     const provider = configManager.get('provider');
     const groqKey = configManager.get('groqKey');
     const openaiKey = configManager.get('openaiKey');
@@ -61,7 +69,11 @@ export class ApiService {
         },
       );
 
-      return { content: response.data.content, readmes: response.data.readmes };
+      return {
+        content: response.data.content,
+        readmes: response.data.readmes,
+        meta: response.data.meta,
+      };
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message;
       throw new Error(`Backend Error: ${msg}`);

@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 async function fetchHistory(token: string | null): Promise<Generation[]> {
   if (!token) return []
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
-  const res = await fetch(`${API_URL}/generate/projects`, {
+  const res = await fetch(`${API_URL}/projects`, {
     headers: { Authorization: `Bearer ${token}` }
   })
   if (!res.ok) return []

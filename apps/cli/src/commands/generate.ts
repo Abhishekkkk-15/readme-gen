@@ -358,6 +358,15 @@ export async function generateCommand(options: {
       if (selectedTemplate) {
         console.log(chalk.dim(`Template: ${selectedTemplate.name} (${selectedTemplate.id})`));
       }
+      if (result.meta) {
+        const tokenText =
+          typeof result.meta.tokensUsed === 'number'
+            ? result.meta.tokensUsed.toLocaleString()
+            : 'unknown';
+        const billingMode =
+          result.meta.executionMode === 'byok' ? 'BYOK' : result.meta.executionMode === 'platform' ? 'platform' : 'unknown';
+        console.log(chalk.dim(`Tokens: ${tokenText} · Billing: ${billingMode}`));
+      }
       console.log(chalk.dim(`Persona: ${selectedPersona}`));
       console.log(chalk.dim('Flow: backend'));
       console.log();
@@ -408,6 +417,8 @@ export async function generateCommand(options: {
         `\nEvidence chunks used: ${result.evidenceChunks.map((c) => `${c.id}~${c.approxTokens}t`).join(', ')}`,
       ),
     );
+    const estimatedTokens = result.evidenceChunks.reduce((sum, chunk) => sum + chunk.approxTokens, 0);
+    console.log(chalk.dim(`Tokens (estimated): ${estimatedTokens.toLocaleString()}`));
     console.log(chalk.dim(`Model: ${model} · Persona: ${selectedPersona} · Mode: ${writeMode}`));
     console.log(chalk.dim('Flow: semantic'));
     console.log();

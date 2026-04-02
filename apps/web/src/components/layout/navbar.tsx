@@ -1,4 +1,4 @@
-import { FileCode2, Menu, Moon, Sun, Terminal } from "lucide-react";
+import { FileCode2, LayoutDashboard, Menu, Moon, Sun, Terminal } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Link, NavLink } from "react-router-dom";
 
@@ -139,9 +139,21 @@ export function Navbar() {
               "hidden gap-1.5 font-mono text-xs md:inline-flex",
             )}>
             <Terminal className="size-3.5" />
-            <span className="hidden lg:inline">npm i -g @readme-gen/cli</span>
-            <span className="lg:hidden">CLI</span>
+              <span className="hidden lg:inline">npm i -g @readme-gen/cli</span>
+              <span className="lg:hidden">CLI</span>
           </Link>
+
+          {isAuthenticated ? (
+            <Link
+              to="/dashboard"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "hidden gap-1.5 sm:inline-flex",
+              )}>
+              <LayoutDashboard className="size-4" />
+              <span className="hidden md:inline">Dashboard</span>
+            </Link>
+          ) : null}
 
           <Button
             variant="ghost"
