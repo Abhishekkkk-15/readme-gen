@@ -56,6 +56,8 @@ export interface Generation {
   modelUsed: string
   createdAt: string
   repoUrl?: string
+  tokensUsed?: number
+  executionMode?: 'platform' | 'byok'
 }
 
 export interface Workspace {
@@ -75,6 +77,8 @@ export interface ReadmeSnapshot {
   createdAt: string
   sourcesUsed: string[]
   modelId?: string
+  tokensUsed?: number
+  executionMode?: 'platform' | 'byok'
 }
 
 export interface ReadmeTemplate {

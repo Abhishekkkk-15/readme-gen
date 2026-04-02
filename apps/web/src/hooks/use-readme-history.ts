@@ -8,6 +8,8 @@ export interface HistoryEntry {
   content: string
   createdAt: string
   modelId?: string
+  tokensUsed?: number
+  executionMode?: 'platform' | 'byok'
 }
 
 export function useReadmeHistory(workspaceId: string) {
@@ -16,13 +18,20 @@ export function useReadmeHistory(workspaceId: string) {
   )
 
   const saveSnapshot = useCallback(
-    (content: string, name: string, modelId?: string) => {
+    (
+      content: string,
+      name: string,
+      modelId?: string,
+      meta?: { tokensUsed?: number; executionMode?: 'platform' | 'byok' },
+    ) => {
       const snap = addSnapshot({
         workspaceId,
         name,
         content,
         sourcesUsed: [],
         modelId,
+        tokensUsed: meta?.tokensUsed,
+        executionMode: meta?.executionMode,
       })
       setHistory((prev) => [snap, ...prev].slice(0, 20))
       return snap

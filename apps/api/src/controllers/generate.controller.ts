@@ -78,6 +78,11 @@ const checkAndResetUsage = async (user: any) => {
   return user;
 };
 
+const shouldEnforceUsageLimits = (
+  user: any,
+  mode: 'platform' | 'byok',
+): boolean => Boolean(user) && mode === 'platform';
+
 export const analyzeRepository = async (req: Request, res: Response): Promise<void> => {
   try {
     const { repoUrl, manualImportantFiles = [] } = req.body;
@@ -127,13 +132,13 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
     const user = (req as any).user;
     const normalizedProvider = normalizeProvider(provider);
 
-    const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
+    const { apiKey, mode } = await resolveExecutionMode(req, normalizedProvider);
     if (!user && !apiKey) {
       res.status(401).json({ error: 'Unauthorized: No user session or API key provided' });
       return;
     }
 
-    if (user) {
+    if (shouldEnforceUsageLimits(user, mode)) {
       await checkAndResetUsage(user);
       if (user.plan === 'free') {
         if (user.usage.generationsUsed >= user.usage.generationsLimit) {
@@ -217,19 +222,32 @@ export const generateReadme = async (req: Request, res: Response): Promise<void>
           title: finalAnalysis.summary.name || 'Untitled',
           description: finalAnalysis.summary.framework?.name || 'Project',
           readmeContent,
+          tokensUsed: totalTokens,
+          modelId,
+          executionMode: mode,
         });
         await newProject.save();
 
-        // Update usage
-        user.usage.generationsUsed += 1;
-        user.usage.tokensUsed += totalTokens;
-        await user.save();
+        if (shouldEnforceUsageLimits(user, mode)) {
+          user.usage.generationsUsed += 1;
+          user.usage.tokensUsed += totalTokens;
+          await user.save();
+        }
       } catch (dbError) {
         console.error('Failed to save to database:', dbError);
       }
     }
 
-    res.status(200).json({ content: readmeContent, readmes });
+    res.status(200).json({
+      content: readmeContent,
+      readmes,
+      meta: {
+        tokensUsed: totalTokens,
+        executionMode: mode,
+        modelId: modelId || null,
+        usage: shouldEnforceUsageLimits(user, mode) ? user?.usage : null,
+      },
+    });
   } catch (error: any) {
     console.error('Error generating README:', error);
     res.status(500).json({ error: error.message || 'Failed to generate README' });
@@ -241,14 +259,14 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
     const { provider, repoUrl, analysis, tone, shields, additionalContext, generateNested, features, persona, heroImageUrl, manualImportantFiles = [], readmeTemplate, templateId, templateBody, writeMode, modelId } = req.body;
     const user = (req as any).user;
     const normalizedProvider = normalizeProvider(provider);
-    const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
+    const { apiKey, mode } = await resolveExecutionMode(req, normalizedProvider);
 
     if (!user && !apiKey) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    if (user) {
+    if (shouldEnforceUsageLimits(user, mode)) {
       await checkAndResetUsage(user);
       if (user.plan === 'free') {
         if (user.usage.generationsUsed >= user.usage.generationsLimit) {
@@ -318,13 +336,42 @@ export const generateStream = async (req: Request, res: Response): Promise<void>
       extraTokens = readmes.reduce((acc, r) => acc + r.tokens, 0);
     }
 
-    if (user) {
+    const totalTokens = Math.ceil(fullContent.length / 4) + extraTokens;
+
+    if (process.env.MONGODB_URI && user) {
+      try {
+        const newProject = new Project({
+          userId: user._id,
+          title: finalAnalysis.summary.name || 'Untitled',
+          description: finalAnalysis.summary.framework?.name || 'Project',
+          readmeContent: fullContent,
+          tokensUsed: totalTokens,
+          modelId,
+          executionMode: mode,
+        });
+        await newProject.save();
+      } catch (dbError) {
+        console.error('Failed to save streamed project to database:', dbError);
+      }
+    }
+
+    if (shouldEnforceUsageLimits(user, mode)) {
        user.usage.generationsUsed += 1;
-       user.usage.tokensUsed += Math.ceil(fullContent.length / 4) + extraTokens;
+       user.usage.tokensUsed += totalTokens;
        await user.save();
     }
 
-    res.write(`data: ${JSON.stringify({ done: true, content: fullContent, readmes })}\n\n`);
+    res.write(`data: ${JSON.stringify({
+      done: true,
+      content: fullContent,
+      readmes,
+      meta: {
+        tokensUsed: totalTokens,
+        executionMode: mode,
+        modelId: modelId || null,
+        usage: shouldEnforceUsageLimits(user, mode) ? user?.usage : null,
+      },
+    })}\n\n`);
     res.end();
   } catch (error: any) {
     console.error('Streaming error:', error);
@@ -350,7 +397,7 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
   try {
     const { text, provider, instruction, userInstruction, modelId } = req.body;
     const normalizedProvider = normalizeProvider(provider);
-    const { apiKey } = await resolveExecutionMode(req, normalizedProvider);
+    const { apiKey, mode } = await resolveExecutionMode(req, normalizedProvider);
     const user = (req as any).user;
 
     if (!user && !apiKey) {
@@ -358,7 +405,7 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    if (user) {
+    if (shouldEnforceUsageLimits(user, mode)) {
       await checkAndResetUsage(user);
       if (user.plan === 'free' && user.usage.tokensUsed >= user.usage.tokensLimit) {
         res.status(403).json({ error: 'Monthly token limit reached' });
@@ -386,12 +433,20 @@ export const improveSection = async (req: Request, res: Response): Promise<void>
       modelId,
     );
 
-    if (user) {
+    if (shouldEnforceUsageLimits(user, mode)) {
       user.usage.tokensUsed += result.tokens;
       await user.save();
     }
 
-    res.status(200).json({ content: result.content });
+    res.status(200).json({
+      content: result.content,
+      meta: {
+        tokensUsed: result.tokens,
+        executionMode: mode,
+        modelId: modelId || null,
+        usage: shouldEnforceUsageLimits(user, mode) ? user?.usage : null,
+      },
+    });
   } catch (error: any) {
     console.error('Error improving content:', error);
     res.status(500).json({ error: error.message || 'Failed to improve content' });

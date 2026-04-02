@@ -27,7 +27,10 @@ async function fetchHistory(token: string | null): Promise<Generation[]> {
     title: d.title,
     content: d.readmeContent,
     createdAt: d.createdAt,
-    repoUrl: d.repoUrl
+    repoUrl: d.repoUrl,
+    tokensUsed: d.tokensUsed,
+    executionMode: d.executionMode,
+    modelUsed: d.modelId || 'Unknown model',
   }))
 }
 
@@ -53,6 +56,9 @@ export function DashboardPage() {
   const tokensUsed = usageUser.usage.tokensUsed || 0
   const tokensLimit = usageUser.usage.tokensLimit || 5000
   const tokensPct = tokensLimit > 0 ? Math.min(100, (tokensUsed / tokensLimit) * 100) : 0
+  const lastGeneration = history[0]
+  const byokRuns = history.filter((g) => g.executionMode === 'byok')
+  const byokTokens = byokRuns.reduce((sum, g) => sum + (g.tokensUsed || 0), 0)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -80,7 +86,7 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-base">Usage & Quotas</CardTitle>
             <CardDescription>
-              Your monthly usage limits for generated READMEs and LLM tokens.
+              Platform-hosted usage this month. BYOK runs are not limited.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -125,6 +131,45 @@ export function DashboardPage() {
       </div>
 
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Generation summary</CardTitle>
+            <CardDescription>Latest run plus BYOK activity from your saved README history.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            {lastGeneration ? (
+              <>
+                <div className="space-y-1">
+                  <p className="font-medium">{lastGeneration.title}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {new Date(lastGeneration.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-lg border border-border/70 p-3">
+                    <p className="text-muted-foreground text-xs">Last tokens</p>
+                    <p className="font-semibold">{(lastGeneration.tokensUsed || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-lg border border-border/70 p-3">
+                    <p className="text-muted-foreground text-xs">Billing mode</p>
+                    <p className="font-semibold">{lastGeneration.executionMode === 'byok' ? 'BYOK' : 'Platform'}</p>
+                  </div>
+                  <div className="rounded-lg border border-border/70 p-3">
+                    <p className="text-muted-foreground text-xs">Model</p>
+                    <p className="font-semibold truncate" title={lastGeneration.modelUsed}>{lastGeneration.modelUsed}</p>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/70 p-3">
+                  <p className="text-muted-foreground text-xs">BYOK saved history</p>
+                  <p className="font-semibold">{byokRuns.length} runs · {byokTokens.toLocaleString()} tokens</p>
+                </div>
+              </>
+            ) : (
+              <p className="text-muted-foreground">Generate a README to start seeing token usage here.</p>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Default model</CardTitle>
@@ -180,6 +225,8 @@ export function DashboardPage() {
                     <p className="truncate text-sm font-medium">{g.title}</p>
                     <p className="text-muted-foreground text-xs">
                       {new Date(g.createdAt).toLocaleDateString()}
+                      {typeof g.tokensUsed === 'number' ? ` · ${g.tokensUsed.toLocaleString()} tokens` : ''}
+                      {g.executionMode ? ` · ${g.executionMode === 'byok' ? 'BYOK' : 'Platform'}` : ''}
                     </p>
                   </div>
                   <Link
@@ -220,6 +267,11 @@ export function DashboardPage() {
                         ) : (
                           'No repo linked'
                         )}
+                      </p>
+                      <p className="text-muted-foreground text-xs">
+                        {typeof g.tokensUsed === 'number' ? `${g.tokensUsed.toLocaleString()} tokens` : 'Token usage unavailable'}
+                        {g.executionMode ? ` · ${g.executionMode === 'byok' ? 'BYOK' : 'Platform'}` : ''}
+                        {g.modelUsed ? ` · ${g.modelUsed}` : ''}
                       </p>
                     </div>
                     <Link to="/generate" className={buttonVariants({ variant: 'outline', size: 'sm' })}>

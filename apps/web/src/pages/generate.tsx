@@ -123,7 +123,7 @@ function reorderMarkdownBySections(md: string, order: { id: string; title: strin
 }
 
 export function GeneratePage() {
-  const { isAuthenticated, token, user } = useAuth()
+  const { isAuthenticated, token, user, updateUser } = useAuth()
   const [isGenerating, setIsGenerating] = useState(false)
   const { activeWorkspace } = useWorkspace()
   const [params] = useSearchParams()
@@ -207,6 +207,11 @@ export function GeneratePage() {
   const [improveInstruction, setImproveInstruction] = useState('')
   const [generationError, setGenerationError] = useState<string | null>(null)
   const [writeMode, setWriteMode] = useState<'overwrite' | 'rewrite' | 'append'>('rewrite')
+  const [generationMeta, setGenerationMeta] = useState<null | {
+    tokensUsed: number
+    executionMode: 'platform' | 'byok'
+    modelId?: string | null
+  }>(null)
 
   useEffect(() => {
     if (user?.plan !== 'pro' && keyMode === 'platform') {
@@ -509,6 +514,7 @@ export function GeneratePage() {
 
     setIsGenerating(true)
     setGenerationError(null)
+    setGenerationMeta(null)
     setMarkdown('') // Clear before streaming
     setGeneratedFiles([])
     setActiveFilePath('README.md')
@@ -603,6 +609,12 @@ export function GeneratePage() {
           if (data.done) {
             setMarkdown(data.content)
             setSectionOrder(parseSectionOrder(data.content))
+            if (data.meta) {
+              setGenerationMeta(data.meta)
+              if (data.meta.usage) {
+                updateUser({ usage: data.meta.usage })
+              }
+            }
             if (data.readmes) {
               setGeneratedFiles([{ path: 'README.md', content: data.content }, ...data.readmes])
             } else {
@@ -631,7 +643,10 @@ export function GeneratePage() {
   
   function saveWork() {
     const name = projectName || 'Untitled README'
-    saveSnapshot(markdown, name, modelId)
+    saveSnapshot(markdown, name, modelId, generationMeta ? {
+      tokensUsed: generationMeta.tokensUsed,
+      executionMode: generationMeta.executionMode,
+    } : undefined)
     toast.success('Version saved to history')
   }
 
@@ -1032,6 +1047,26 @@ export function GeneratePage() {
 
       {step === 3 ? (
         <div className="space-y-4">
+          {generationMeta && (
+            <Card className="border-emerald-500/30 bg-emerald-500/5">
+              <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 p-4 text-sm">
+                <div>
+                  <span className="font-medium">Tokens used:</span>{' '}
+                  {generationMeta.tokensUsed.toLocaleString()}
+                </div>
+                <div>
+                  <span className="font-medium">Billing mode:</span>{' '}
+                  {generationMeta.executionMode === 'byok' ? 'Your API key' : 'Platform-hosted'}
+                </div>
+                {generationMeta.modelId ? (
+                  <div>
+                    <span className="font-medium">Model:</span>{' '}
+                    {generationMeta.modelId}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
           {generationError && (
             <Card className="border-destructive/40 bg-destructive/5">
               <CardContent className="p-4">
@@ -1309,6 +1344,11 @@ export function GeneratePage() {
                             <p className="font-medium text-sm">{h.name}</p>
                             <p className="text-xs text-muted-foreground mt-1">
                               {new Date(h.createdAt).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {typeof h.tokensUsed === 'number' ? `${h.tokensUsed.toLocaleString()} tokens` : 'Token usage unavailable'}
+                              {h.executionMode ? ` · ${h.executionMode === 'byok' ? 'BYOK' : 'Platform'}` : ''}
+                              {h.modelId ? ` · ${h.modelId}` : ''}
                             </p>
                           </div>
                           {diffTarget === h.id && (
