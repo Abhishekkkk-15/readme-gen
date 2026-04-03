@@ -65,7 +65,7 @@ class LLMService {
 
   /**
    * Build a comprehensive grounding context from ProjectSummary.
-   * Formats data as copy-paste-ready markdown blocks the LLM can directly include.
+   * Formats data into structured XML-like blocks for precise LLM parsing.
    */
   private buildGroundingContext(
     summary: ProjectSummary,
@@ -78,11 +78,11 @@ class LLMService {
 
     if (summary.existingReadme?.content?.trim()) {
       sections.push(
-        `### EXISTING README (${summary.existingReadme.path})\nUse this as source material to revise, expand, and correct. Preserve useful wording, sections, and examples where accurate; replace outdated or generic content when grounding data contradicts it.\n\n\`\`\`md\n${summary.existingReadme.content.trim().slice(0, 12000)}\n\`\`\``,
+        `<existing_readme path="${summary.existingReadme.path}">\n${summary.existingReadme.content.trim().slice(0, 12000)}\n</existing_readme>`,
       );
     }
 
-    // --- TECH STACK SUMMARY (one-liner the LLM can copy) ---
+    // --- TECH STACK SUMMARY ---
     const stackParts: string[] = [];
     if (summary.language) stackParts.push(summary.language);
     if (summary.framework?.name) stackParts.push(summary.framework.name);
@@ -90,24 +90,25 @@ class LLMService {
     if (summary.hasDocker) stackParts.push("Docker");
     const features = summary.features || [];
     if (features.length > 0) stackParts.push(...features.slice(0, 6));
+
     sections.push(
-      `### TECH STACK (copy this into the README):\n**Built with**: ${stackParts.join(", ")}`,
+      `<tech_stack_summary>\nBuilt with: ${stackParts.join(", ")}\n</tech_stack_summary>`,
     );
 
-    // --- DEPENDENCIES (formatted as a list the LLM should reference) ---
+    // --- DEPENDENCIES ---
     const deps = summary.dependencies || [];
     if (deps.length > 0) {
       const keyDeps = deps.filter((d) => !d.startsWith("@types/")).slice(0, 20);
       sections.push(
-        `### KEY DEPENDENCIES (mention these by name in a "Tech Stack" or "Dependencies" section):\n${keyDeps.map((d) => `- **${d}**`).join("\n")}`,
+        `<key_dependencies>\n${keyDeps.map((d) => `- ${d}`).join("\n")}\n</key_dependencies>`,
       );
     }
 
-    // --- SCRIPTS (package-manager aware + monorepo paths) ---
+    // --- SCRIPTS ---
     const scriptsMd = buildScriptsMarkdown(summary);
     if (scriptsMd) {
       sections.push(
-        `### AVAILABLE COMMANDS (include in Installation/Usage — use this table, do not rewrite as generic npm unless shown):\n${scriptsMd}`,
+        `<available_commands>\n${scriptsMd}\n</available_commands>`,
       );
     }
 
@@ -117,99 +118,66 @@ class LLMService {
       const header =
         "| Method | Endpoint | Source File |\n|--------|----------|-------------|";
       const rows = routes.map(
-        (r) => `| ${r.method.toUpperCase()} | \`${r.path}\` | ${r.file} |`,
+        (r) => `| ${r.method.toUpperCase()} | ${r.path} | ${r.file} |`,
       );
       sections.push(
-        `### API ENDPOINTS (include this table in the README):\n${header}\n${rows.join("\n")}`,
+        `<api_endpoints>\n${header}\n${rows.join("\n")}\n</api_endpoints>`,
       );
     }
 
-    // --- ROUTE SNIPPETS (verbatim evidence for examples) ---
+    // --- ROUTE SNIPPETS ---
     const routeSnippets = (summary.routes || [])
       .filter((r) => Boolean(r.snippet))
       .slice(0, 8);
     if ((includeApi || includeUsage) && routeSnippets.length > 0) {
       sections.push(
-        `### ROUTE HANDLER SNIPPETS (use these verbatim for API descriptions/examples):\n` +
+        `<api_route_snippets>\n` +
           routeSnippets
             .map(
               (r) =>
-                `- \`${r.method.toUpperCase()} ${r.path}\` (${r.file})\n\`\`\`ts\n${String(r.snippet).trim().slice(0, 800)}\n\`\`\``,
+                `- ${r.method.toUpperCase()} ${r.path} (${r.file})\n\`\`\`ts\n${String(r.snippet).trim().slice(0, 800)}\n\`\`\``,
             )
-            .join("\n"),
+            .join("\n") +
+          `\n</api_route_snippets>`,
       );
     }
 
-    // --- ENV VARS as a config block ---
+    // --- ENV VARS ---
     const envVars = summary.envVars || [];
     if (envVars.length > 0) {
       sections.push(
-        `### ENVIRONMENT VARIABLES (include ALL of these in a config section):\n\`\`\`env\n${envVars.map((v) => `${v}=your_value_here`).join("\n")}\n\`\`\``,
-      );
-    }
-
-    // --- ENTRY POINTS ---
-    const entryPoints = summary.entryPoints || [];
-    if (entryPoints.length > 0) {
-      sections.push(
-        `### ENTRY POINTS:\n${entryPoints.map((e) => `- \`${e}\``).join("\n")}`,
-      );
-    }
-
-    // --- FRAMEWORK ---
-    if (summary.framework?.name) {
-      sections.push(
-        `### Framework: **${summary.framework.name}** (confidence: ${summary.framework.confidence})`,
+        `<environment_variables>\n\`\`\`env\n${envVars.map((v) => `${v}=your_value_here`).join("\n")}\n\`\`\`\n</environment_variables>`,
       );
     }
 
     // --- MONOREPO STRUCTURE ---
     if (summary.isMonorepo) {
-      sections.push(`### Project Structure: **Monorepo**`);
       const keyDirs = summary.keyDirectories || [];
-      if (keyDirs.length > 0) {
-        sections.push(
-          `### Key Directories:\n${keyDirs.map((d) => `- \`${d}/\``).join("\n")}`,
-        );
-      }
+      sections.push(
+        `<project_structure type="Monorepo">\n${keyDirs.length > 0 ? `Key Directories:\n${keyDirs.map((d) => `- ${d}/`).join("\n")}` : "Standard Monorepo structure."}\n</project_structure>`,
+      );
     }
 
     // --- DB SCHEMAS ---
     const schemas = summary.dbSchemas || [];
     if (schemas.length > 0) {
       sections.push(
-        `### Database Models:\n${schemas.map((s) => `- **${s.model}**: ${s.fields.join(", ")} (${s.file})`).join("\n")}`,
+        `<database_models>\n${schemas.map((s) => `- ${s.model}: ${s.fields.join(", ")} (${s.file})`).join("\n")}\n</database_models>`,
       );
     }
 
-    // --- DOCKER ---
-    if (summary.hasDocker && summary.devOps?.docker) {
-      const d = summary.devOps.docker;
-      sections.push(
-        `### Docker:\n- Base Image: \`${d.baseImage || "N/A"}\`\n- Ports: ${(d.ports || []).join(", ") || "N/A"}\n- Command: \`${d.command || "N/A"}\``,
-      );
-    }
-
-    // --- AST FEATURES ---
-    const astFeatures = summary.astFeatures || [];
-    if (astFeatures.length > 0) {
-      sections.push(
-        `### Code Patterns (AST-detected):\n${astFeatures.map((f) => `- **${f.name}** found in: ${f.evidence.map((e) => e.file).join(", ")}`).join("\n")}`,
-      );
-    }
-
-    // --- REAL EXAMPLES (from tests) ---
+    // --- REAL EXAMPLES ---
     const examples = summary.examples || [];
     if (examples.length > 0) {
       const rendered = examples
         .slice(0, 6)
         .map((ex) => {
           const code = (ex.code || "").trim().slice(0, 1200);
-          return `- **${ex.description}** (${ex.file})\n\`\`\`ts\n${code}\n\`\`\``;
+          return `- ${ex.description} (${ex.file})\n\`\`\`ts\n${code}\n\`\`\``;
         })
         .join("\n");
       sections.push(
-        `### REAL USAGE EXAMPLES (prefer these in Usage/Quick Start):\n${rendered}`,
+        `<real_usage_examples>\n${rendered}\n</real_usage_examples>`,
       );
     }
 
@@ -218,7 +186,6 @@ class LLMService {
 
   /**
    * Evidence index for forcing concrete examples (functions/classes/interfaces).
-   * This comes from ProjectContext.evidence (DefinitionExtractor) and is stronger than summaries.
    */
   private buildEvidenceIndex(context: ProjectContext): string {
     const files = context?.evidence?.files || [];
@@ -242,7 +209,7 @@ class LLMService {
    */
   private buildSectionPrompt(sections: string[] = []): string {
     if (sections.length === 0) {
-      return `## MANDATORY SECTIONS:\nInclude standard README sections based on the Grounding Data.`;
+      return `## MANDATORY SECTIONS:\nInclude standard README sections based on the Grounding Data. Use professional headings and appropriate emojis.`;
     }
 
     const instructions: string[] = [
@@ -251,37 +218,37 @@ class LLMService {
 
     if (sections.includes("Architecture")) {
       instructions.push(
-        `- **Architecture**: Create an elegant \`mermaid\` state or flowchart diagram explaining the domain flow and structure.`,
+        `- **Architecture**: Create an elegant \`mermaid\` flowchart explaining the domain flow. Use \`graph LR\` or \`graph TD\`. IMPORTANT: Do NOT use sequence diagram syntax (e.g. \`participant\` or \`->>\`). Use standard flowchart syntax for nodes and edges with labels (e.g., \`A[Frontend] -->|Label| B[Backend]\`). Start the mermaid block with %%{init: {'theme': 'neutral'}}%% for a professional appearance. Explain the high-level architecture before the diagram.`,
       );
     }
     if (sections.includes("Installation")) {
       instructions.push(
-        `- **Installation**: Provide EXACT setup scripts (e.g. \`npm install\`). If monorepo, emphasize using \`--filter\` or workspace commands.`,
+        `- **Installation**: Provide EXACT setup scripts (e.g. \`npm install\`). If a monorepo is detected, emphasize using workspace-aware commands. Use code blocks with the correct language identifier.`,
       );
     }
     if (sections.includes("Usage")) {
       instructions.push(
-        `- **Usage**: Provide at least 2 concrete examples using real endpoints/routes OR real exported functions/classes from the Code Surface. Prefer examples from "REAL USAGE EXAMPLES" when present.`,
+        `- **Usage**: Provide at least 2 "Copy-Paste Ready" examples using data from <api_route_snippets> or <real_usage_examples>. Use realistic parameters. Highlight key lines with comments.`,
       );
     }
     if (sections.includes("API")) {
       instructions.push(
-        `- **API Reference**: Document ALL routes from Grounding Data with method, path, and description.`,
+        `- **API Reference**: Document ALL routes from <api_endpoints> in a clean markdown table with columns: Method, Endpoint, Description, and Auth (if detectable).`,
       );
     }
     if (sections.includes("Testing")) {
       instructions.push(
-        `- **Testing**: Provide commands from Grounding Data on how to run the test suite and linters.`,
+        `- **Testing**: Provide commands for running the test suite and linters. Include a brief section on how to add new tests.`,
       );
     }
     if (sections.includes("Deployment")) {
       instructions.push(
-        `- **Deployment**: Provide build commands or Docker deployment instructions from Grounding Data.`,
+        `- **Deployment**: Provide build commands or Docker deployment instructions from <tech_stack_summary>. Include environment variable requirements.`,
       );
     }
     if (sections.includes("Contributing")) {
       instructions.push(
-        `- **Contributing**: Briefly outline typical contribution guidelines (PR process, code standards).`,
+        `- **Contributing**: Briefly outline the PR process and code standards. Use a welcoming tone.`,
       );
     }
     if (sections.includes("License")) {
@@ -346,23 +313,37 @@ ${JSON.stringify(templateMarkdown)}
     const writeMode =
       options.writeMode ||
       (summary.existingReadme?.content?.trim() ? "rewrite" : "overwrite");
+
     const groundingContext = this.buildGroundingContext(
       summary,
       options.sections,
     );
     const evidenceIndex = this.buildEvidenceIndex(context);
+
+    // Styling rules to ensure premium look and feel
+    const stylingRules = `## STYLING & FORMATTING RULES:
+- **VISUAL HIERARCHY**: Use emojis for section headings (e.g., 🚀 Quick Start, 🛠️ Tech Stack).
+- **CALLOUTS**: Use GitHub-flavored markdown callouts for important notes (e.g., \`> [!NOTE]\`, \`> [!TIP]\`, \`> [!IMPORTANT]\`, \`> [!WARNING]\`).
+- **TABLES**: Use well-formatted markdown tables for API routes, environment variables, and script lists.
+- **MERMAID**: Use Mermaid diagrams for architecture/flow sections.
+- **NO Hallucinations**: Do not invent links, images, or features not present in the grounding data.
+- **CLEAN PROSE**: Write clean, concise, and professional technical documentation.`;
+
     const sectionInstructions =
       usesTemplate ?
         `## SECTIONS\nUse **only** the STRUCTURE TEMPLATE for which headings exist and their order. Ignore any conflicting free-form section list.`
       : this.buildSectionPrompt(options.sections);
+
     const templateBlock =
       usesTemplate ? this.formatReadmeTemplateSpec(tpl!, summary) : "";
+
     const outputInstruction =
       writeMode === "append" ?
         `README CONTENT (APPEND-ONLY: return ONLY new markdown to append to the existing README. Start with a \`##\` heading and avoid repeating existing sections):`
       : usesTemplate ?
         `README CONTENT (open exactly as the template does - usually a single \`#\` title line):`
       : `README CONTENT (START WITH #):`;
+
     const strictRules =
       usesTemplate ?
         `## STRICT RULES:
@@ -370,7 +351,7 @@ ${JSON.stringify(templateMarkdown)}
 - **GROUNDING**: All factual claims from GROUNDING DATA, CODE SURFACE, or ADDITIONAL CONTEXT only.
 - **EXAMPLES**: Prefer real commands, routes, and identifiers from CODE SURFACE; do not invent HTTP paths or CLI flags.
 - **GAPS**: If a template subsection has no grounded content, one short honest sentence (e.g. not applicable / not detected) - never fabricate.
-- **EXISTING README MODE**: ${writeMode}. Append mode is not compatible with template generation.
+- **EXISTING README MODE**: ${writeMode}.
 - **TONE**: ${targetTone}.
 
 ${outputInstruction}
@@ -381,35 +362,37 @@ ${outputInstruction}
 - **EXISTING README HANDLING**: If an EXISTING README is provided and mode is \`rewrite\`, treat this task as a rewrite/update pass. Reuse valuable structure and wording where it is still accurate, but fix stale, weak, or generic sections using the grounded facts.
 - **APPEND MODE**: If mode is \`append\`, return ONLY net-new markdown to append. Do not repeat the title, badges, overview, or sections that already exist unless you are extending them with grounded new information.
 - **OMIT UNSELECTED SECTIONS**: If a section is not listed in MANDATORY SECTIONS, do NOT generate it.
-- **MENTION DEPENDENCIES**: Reference key dependencies by name when discussing the tech stack.
-- **MENTION ALL ROUTES/ENV VARS**: If API/Env sections are requested, list them all.
 - **REAL EXAMPLES ONLY**: For Usage/Quick Start/API examples, you MUST use real endpoint paths (e.g. \`/api/...\`) and real function/class names from CODE SURFACE. If you can't ground an example, omit it rather than inventing it.
-- **INCORPORATE CONTEXT**: Integrate the 'ADDITIONAL CONTEXT' into the Overview and Architecture sections to explain the "Why" and the business value.
 - **NO PLACEHOLDERS**: Every generated section must be populated with real facts. No "Coming soon" or "TODO".
 - **TONE**: ${targetTone}.
 
 ${outputInstruction}
 `;
+
     const prompt = `Generate a comprehensive, enterprise-grade README.md for ${summary.name}.
 
 ## PERSONA
 ${options.persona || "Senior Developer"}: ${personaGuidance}
 
-## INTELLIGENCE (from code analysis)
+## INTELLIGENCE (Technical context of the project)
 ${projectManifest}
 
-## CODE ARTIFACTS INVENTORY
+## CODE ARTIFACTS INVENTORY (Ground truth analysis)
 ${technicalTruthMap}
 
-## GROUNDING DATA (YOU MUST USE THESE EXACT FACTS${usesTemplate ? "" : " - DO NOT INVENT"})
+## GROUNDING DATA (Context wrapped in XML tags - DO NOT DEVIATE FROM THESE FACTS)
 ${groundingContext}
 
-## CODE SURFACE (YOU MUST QUOTE THESE VERBATIM WHEN WRITING EXAMPLES)
+## CODE SURFACE (Verbatim code signatures for usage examples)
 ${evidenceIndex}
 
-${templateBlock}${sectionInstructions}
+${templateBlock}
 
-## ADDITIONAL CONTEXT (CRITICAL BUSINESS LOGIC / WHY IT EXISTS)
+${sectionInstructions}
+
+${stylingRules}
+
+## ADDITIONAL CONTEXT (Business logic / User intent)
 ${options.additionalContext || "No additional context provided."}
 
 ${strictRules}`;
@@ -698,15 +681,15 @@ Return 1 detailed paragraph "Intelligence Manifest".`;
   private getPersonaGuidance(persona: string): string {
     switch (persona.toLowerCase()) {
       case "senior developer":
-        return "Emphasize architecture, performance, and maintainability. Use precise technical terms. Focus on data flow and state management.";
+        return "Emphasize architecture, performance, and maintainability. Use precise technical terms. Focus on data flow and state management. Provide deep technical insights and avoid fluff.";
       case "startup founder":
-        return "Focus on the value proposition, high-level features, and speed of getting started. Keep it polished, visionary, and user-centric.";
+        return "Focus on the value proposition, high-level features, and speed of getting started. Keep it polished, visionary, and user-centric. Use engaging language but stay grounded in facts.";
       case "educational/beginner":
-        return "Explain concepts simply, provide step-by-step guidance, and explain *how* things work under the hood in a clear way.";
+        return "Explain concepts simply, provide step-by-step guidance, and explain *how* things work under the hood. Use analogies where appropriate but keep code examples accurate.";
       case "open source contributor":
-        return "Emphasize community guidelines, contribution flows, testing, and issue reporting. Keep it welcoming but rigorous.";
+        return "Emphasize community guidelines, contribution flows, testing, and issue reporting. Keep it welcoming but rigorous. Ensure the build process is crystal clear.";
       default:
-        return "Standard technical documentation persona.";
+        return "Provide standard professional technical documentation. Focus on clarity and accuracy.";
     }
   }
 

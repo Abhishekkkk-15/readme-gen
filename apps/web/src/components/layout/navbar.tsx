@@ -8,6 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -198,16 +199,18 @@ export function Navbar() {
                 }
               />
               <DropdownMenuContent align="end" className="min-w-48">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-foreground text-sm font-medium">
-                      {user?.email ?? "Guest session"}
-                    </span>
-                    <span className="text-muted-foreground text-xs">
-                      {user ? `${user.plan} plan` : "Limited local preview"}
-                    </span>
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-foreground text-sm font-medium">
+                        {user?.email ?? "Guest session"}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {user ? `${user.plan} plan` : "Limited local preview"}
+                      </span>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem render={<Link to="/dashboard" />}>
                   Dashboard
