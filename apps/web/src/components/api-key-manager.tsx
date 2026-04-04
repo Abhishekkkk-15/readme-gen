@@ -62,8 +62,8 @@ export function ApiKeyManager({
     }
   }
 
-  function handleProviderChange(nextProvider: string) {
-    if (providers.includes(nextProvider as ApiKeyProvider)) {
+  function handleProviderChange(nextProvider: string | null) {
+    if (nextProvider && providers.includes(nextProvider as ApiKeyProvider)) {
       setProvider(nextProvider as ApiKeyProvider)
     }
   }

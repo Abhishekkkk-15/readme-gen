@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
-import { FolderGit, KeyRound, LogOut } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
@@ -58,19 +58,16 @@ export function AuthPage() {
     login,
     register,
     logout,
-    enterGuest,
-    loginWithGoogle,
-    loginWithGithub,
   } = useAuth();
   const navigate = useNavigate();
 
   const loginForm = useForm<LoginValues>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchema as any),
     defaultValues: { email: "", password: "", apiKey: "" },
   });
 
   const regForm = useForm<RegisterValues>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(registerSchema as any),
     defaultValues: { email: "", password: "", confirm: "", apiKey: "" },
   });
 

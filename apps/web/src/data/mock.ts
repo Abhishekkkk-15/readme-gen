@@ -3,6 +3,8 @@ import type { Generation, Model, User } from '@/types'
 export const mockUser: User = {
   id: 'usr_1',
   email: 'dev@example.com',
+  displayName: 'Dev User',
+  provider: 'local',
   plan: 'pro',
   apiKeys: [
     { provider: 'OpenAI', key: 'sk-••••••••••••4f21', lastUsed: '2026-03-27T10:00:00.000Z' },
@@ -12,6 +14,9 @@ export const mockUser: User = {
   usage: {
     generationsUsed: 42,
     generationsLimit: -1,
+    tokensUsed: 125000,
+    tokensLimit: -1,
+    lastResetDate: '2026-03-01T00:00:00.000Z',
   },
 }
 

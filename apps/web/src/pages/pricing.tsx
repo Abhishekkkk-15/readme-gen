@@ -54,7 +54,7 @@ export function PricingPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const form = useForm<CustomForm>({
-    resolver: zodResolver(customSchema),
+    resolver: zodResolver(customSchema as any),
     defaultValues: { company: '', email: '', notes: '' },
   })
 
