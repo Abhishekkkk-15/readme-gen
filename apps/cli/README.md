@@ -1,81 +1,105 @@
-# @readme-gen/cli
+# 🖥️ @readme-gen/cli
 
-Command-line interface for `readme-gen`.
+**The local-first AI documentation engine for your terminal.**
 
-The CLI analyzes a local project and generates grounded README files. It supports both the local semantic pipeline and the backend generation flow when template-driven or nested README output is required.
+---
 
-## Commands
+## 📖 Overview
 
+The `readmegen` CLI (also aliased as `devcon`) is a powerful tool for analyzing your local codebase and generating README files without ever leaving your terminal. It leverages the shared `@readme-gen/analyzer` package to extract project grounding evidence and provide state-of-the-art documentation generation.
+
+---
+
+## ⚙️ Core Commands
+
+### 🚦 Quick Start
 ```bash
+# Initialize your API keys and default provider
 readmegen init
+
+# Generate a basic README with default options
 readmegen generate
+
+# Preview the last generated README in your terminal
 readmegen preview
+```
+
+### 🛠️ Config Management
+```bash
+# View your current CLI configuration
 readmegen config view
-readmegen config set-key <key>
-readmegen config set-model <model>
+
+# Update a specific provider's API key
+readmegen config set-key <key> --provider groq
+
+# Set the default model for all generations
+readmegen config set-model <model-id>
+
+# Reset all CLI settings to default
 readmegen config reset
 ```
 
-`devcon` is an alias for the same CLI binary.
+---
 
-## Generation Modes
+## 🏗️ Generation Flows
 
-### Semantic local flow
+The CLI intelligently chooses between two distinct generation paths:
 
-Used by default when you want local analysis plus semantic README generation.
+### 1. Semantic Local Flow (Default)
+The **Semantic Local Flow** uses the analyzer package to build a structured project understanding *locally*. It handles:
+- **Rewrite**: Improving an existing README while preserving structure.
+- **Append**: Adding new grounded sections derived from code evidence.
+- **Dynamic Context**: Injecting extra business context into the generation.
+
+### 2. Backend / Template Flow
+The **Backend Flow** delegates generation to the API for more complex tasks:
+- **Monorepo Templates**: Using pre-defined layouts for complex projects.
+- **Nested READMEs**: Generating and saving multiple README files for sub-directories in a single pass.
+- **Model Overrides**: Forcing specific platform-hosted models.
+
+---
+
+## 💡 Advanced Usage
+
+### Skipping Interactive Prompts
+If you provide a flag, the CLI is smart enough to skip that specific interactive prompt.
+
+```bash
+# This will skip the "tone" Selection and use "minimal" automatically
+readmegen generate --tone minimal
+```
+
+### Full Automated Generation
+For CI/CD or non-interactive environments, use the `--yes` flag:
 
 ```bash
 readmegen generate \
-  --provider groq \
-  --model llama-3.3-70b-versatile \
-  --llm-delay-ms 30000 \
-  --mode rewrite
+  --tone professional \
+  --persona "Senior Developer" \
+  --sections Installation Usage Features \
+  --yes
 ```
 
-### Backend flow
-
-Used when template-driven layout generation or nested README generation is requested.
+### Pacing LLM Requests
+If you are working on a large repository and hitting Rate Limits (TPM), use the `--llm-delay-ms` flag:
 
 ```bash
-readmegen generate \
-  --template monorepo \
-  --nested
+readmegen generate --llm-delay-ms 30000
 ```
 
-## Features
+---
 
-- Local codebase analysis with the shared analyzer package
-- Existing README handling: `overwrite`, `rewrite`, `append`
-- Model-aware provider selection
-- Configurable inter-call LLM pacing with `--llm-delay-ms`
-- Token reporting after generation
-- Config-backed API key and model management
-
-## Development
+## 🛠️ Development
 
 From the workspace root:
 
 ```bash
 pnpm --filter @readme-gen/cli build
 pnpm --filter @readme-gen/cli start
-pnpm --filter @readme-gen/cli exec tsc --noEmit
 ```
 
-## Environment
+---
 
-The CLI can read provider keys from environment variables or from saved config created by `readmegen init`.
-
-Common variables:
-
-```env
-OPENAI_API_KEY=
-GOOGLE_GENERATIVE_AI_API_KEY=
-GROQ_API_KEY=
-```
-
-## Notes
-
-- Semantic local generation reports estimated token usage
-- Backend/API generation reports exact token usage when returned by the API
-- `append` and `rewrite` are semantic-flow features and are intentionally guarded against incompatible template flows
-- If a provider hits TPM limits on a large repo, rerun with `--llm-delay-ms 30000` or higher
+<div align="center">
+  <sub>Part of the 🚀 <a href="../../README.md">readme-gen</a> ecosystem.</sub>
+</div>

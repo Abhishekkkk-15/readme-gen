@@ -1,64 +1,77 @@
-# @readme-gen/analyzer
+# 🧬 @readme-gen/analyzer
 
-Shared repository analysis and semantic README pipeline for `readme-gen`.
+**The shared repository analysis engine and semantic README pipeline for the readme-gen platform.**
 
-This package is used by both the API and CLI. It extracts grounded repository evidence and provides the semantic pipeline used to generate README files from structured project understanding instead of raw prompt-only summaries.
+---
 
-## Responsibilities
+## 📖 Overview
 
-- Analyze repository structure and important files
-- Parse manifests, scripts, dependencies, and package manager hints
-- Extract routes, env vars, examples, schemas, and source definitions
-- Build semantic evidence blocks for LLM stages
-- Run the semantic README pipeline
-- Evaluate README quality after generation
+The `analyzer` package is the core grounding layer for all `readme-gen` generation. It extracts project evidence and provides a multi-stage semantic pipeline to ensure generated documentation is tied to concrete code data instead of generic model guesses.
 
-## Core Concepts
+### Key Responsibilities
+- **Repository Structural Analysis**: Mapping file systems and identifying monorepo boundaries.
+- **Evidence Extraction**: Parsing package manifests, API routes, environment variables, and source signatures.
+- **Semantic Mapping**: Merging raw extraction data into a canonical, AI-ready JSON structure.
+- **Generation Orchestration**: Running the multi-stage LLM pipeline.
+- **Quality Evaluation**: Scoring generated READMEs for clarity, completeness, and accuracy.
 
-### Analysis output
+---
 
-The package produces:
+## 🏗️ Semantic Pipeline
 
-- `summary`: high-level project facts
-- `context`: deeper evidence and extracted signatures
+The `analyzer` uses a sophisticated 6-stage pipeline to build high-quality documentation:
 
-### Semantic pipeline
+1.  **🔍 Evidence Extraction**: Gathers raw project facts (Dependencies, Routes, Env Vars, AST Patterns).
+2.  **🧠 Intent Inference**: Deduces "why" the project exists and its primary goal.
+3.  **✨ Feature Extraction**: Distills user-facing capabilities from extracted signatures.
+4.  **🏛️ Architecture Analysis**: Maps internal project structure and flow.
+5.  **🧩 Semantic Merge**: Consolidates all discoveries into a unified `ProjectAnalysis` object.
+6.  **✍️ Markdown Generation**: Orchestrates the final markdown construction from semantic JSON.
 
-The pipeline stages are:
+---
 
-1. gather semantic evidence
-2. infer project intent
-3. extract user-facing features
-4. analyze architecture
-5. merge results into canonical semantic JSON
-6. generate README markdown from that JSON
+## 🛠️ Package Structure
 
-## Development
+```text
+src/
+├── analyzers/    # Specialized extractors for Files, Routes, Env, and AST
+├── internal/     # Semantic pipeline, Evidence builder, and LLM orchestration
+├── utils/        # Shared prompt engineering and markdown rendering helpers
+├── types.ts      # Repository-wide project analysis and extraction types
+└── constants/    # Persona definitions and prompt templates
+```
+
+---
+
+## 📝 Key Features
+
+### Grounded Generation
+The analyzer ensures that everything in the final README is backed by code evidence.
+- **Rewriting Mode**: Maintains custom sections while updating grounding facts.
+- **Appending Mode**: Intelligently adds new sections to existing documentation.
+
+### Multi-Model Compatibility
+The analyzer's prompts are optimized for:
+- **OpenAI** (GPT-4o / GPT-3.5)
+- **Gemini** (Pro 1.5 / Flash)
+- **Groq** (Llama 3 / Mixtral)
+
+---
+
+## 🛠️ Development
 
 From the workspace root:
 
 ```bash
 pnpm --filter @readme-gen/analyzer build
-pnpm --filter @readme-gen/analyzer dev
 ```
 
-## Package Layout
+### Dependencies
+- **ts-morph**: For high-fidelity AST analysis and source signature extraction.
+- **ignore**: For respecting `.gitignore` rules during project analysis.
 
-```text
-src/
-|- analyzers/   file, route, env, schema, and AST analyzers
-|- internal/    semantic pipeline, evidence builder, and LLM client
-|- utils/       shared prompt/render helpers
-|- types.ts     shared analysis types
-```
+---
 
-## Dependencies
-
-- `ignore`
-- `ts-morph`
-
-## Notes
-
-- The analyzer is the main grounding layer for README generation quality
-- Existing README content is included as context so rewrite/append flows stay repo-aware
-- The semantic pipeline is used directly by the CLI local generation path
+<div align="center">
+  <sub>Part of the 🚀 <a href="../../README.md">readme-gen</a> ecosystem.</sub>
+</div>
