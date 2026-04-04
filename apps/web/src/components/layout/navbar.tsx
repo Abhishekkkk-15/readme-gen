@@ -1,4 +1,11 @@
-import { FileCode2, LayoutDashboard, Menu, Moon, Sun, Terminal } from "lucide-react";
+import {
+  FileCode2,
+  LayoutDashboard,
+  Menu,
+  Moon,
+  Sun,
+  Terminal,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { Link, NavLink } from "react-router-dom";
 
@@ -42,7 +49,7 @@ function NavLinks({
     <nav
       className={cn(
         "flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1",
-        className,
+        className
       )}>
       {nav.map(({ to, label }) => (
         <NavLink
@@ -52,7 +59,7 @@ function NavLinks({
           className={({ isActive }) =>
             cn(
               "text-muted-foreground hover:text-foreground rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              isActive && "bg-accent text-accent-foreground",
+              isActive && "bg-accent text-accent-foreground"
             )
           }>
           {label}
@@ -96,16 +103,17 @@ export function Navbar() {
                   to="/docs#cli-installation"
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
-                    "inline-flex justify-start gap-2",
+                    "inline-flex justify-start gap-2"
                   )}>
                   <Terminal className="size-4" />
                   Install CLI
                 </Link>
-                {!isAuthenticated ?
+                {!isAuthenticated ? (
                   <Link to="/auth" className={buttonVariants()}>
                     Sign in
                   </Link>
-                : <>
+                ) : (
+                  <>
                     <Link
                       to="/dashboard"
                       className={buttonVariants({ variant: "secondary" })}>
@@ -115,7 +123,7 @@ export function Navbar() {
                       Generate
                     </Link>
                   </>
-                }
+                )}
               </div>
             </SheetContent>
           </Sheet>
@@ -137,11 +145,11 @@ export function Navbar() {
             to="/docs#cli-installation"
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "hidden gap-1.5 font-mono text-xs md:inline-flex",
+              "hidden gap-1.5 font-mono text-xs md:inline-flex"
             )}>
             <Terminal className="size-3.5" />
-              <span className="hidden lg:inline">npm i -g @readme-gen/cli</span>
-              <span className="lg:hidden">CLI</span>
+            <span className="hidden lg:inline">npm i -g @readme-gen/cli</span>
+            <span className="lg:hidden">CLI</span>
           </Link>
 
           {isAuthenticated ? (
@@ -149,7 +157,7 @@ export function Navbar() {
               to="/dashboard"
               className={cn(
                 buttonVariants({ variant: "ghost", size: "sm" }),
-                "hidden gap-1.5 sm:inline-flex",
+                "hidden gap-1.5 sm:inline-flex"
               )}>
               <LayoutDashboard className="size-4" />
               <span className="hidden md:inline">Dashboard</span>
@@ -168,16 +176,17 @@ export function Navbar() {
             <Moon className="absolute size-4 scale-0 dark:scale-100" />
           </Button>
 
-          {!isAuthenticated ?
+          {!isAuthenticated ? (
             <Link
               to="/auth"
               className={cn(
                 buttonVariants({ size: "sm" }),
-                "hidden sm:inline-flex",
+                "hidden sm:inline-flex"
               )}>
               Sign in
             </Link>
-          : <DropdownMenu>
+          ) : (
+            <DropdownMenu>
               <DropdownMenuTrigger
                 render={
                   <Button variant="ghost" size="sm" className="gap-2 px-1.5">
@@ -188,13 +197,13 @@ export function Navbar() {
                         </AvatarFallback>
                       </Avatar>
                     </Link>
-                    {isGuest ?
+                    {isGuest ? (
                       <Badge
                         variant="secondary"
                         className="hidden text-[10px] sm:inline-flex">
                         Guest
                       </Badge>
-                    : null}
+                    ) : null}
                   </Button>
                 }
               />
@@ -218,18 +227,18 @@ export function Navbar() {
                 <DropdownMenuItem render={<Link to="/generate" />}>
                   New README
                 </DropdownMenuItem>
-                {user ?
+                {user ? (
                   <DropdownMenuItem render={<Link to="/auth#keys" />}>
                     API keys
                   </DropdownMenuItem>
-                : null}
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={logout}>
                   Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          }
+          )}
         </div>
       </div>
     </header>

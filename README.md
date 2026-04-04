@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="C:\Users\USE05\.gemini\antigravity\brain\8e4aa6e5-ccb5-485a-8162-da854f3e0d6c\readme_gen_hero_1775279630811.png" alt="readme-gen Hero" width="800">
+  <img src="icon.svg" alt="readme-gen Hero" background-color="blue" width="800">
   
   # 🚀 readme-gen
   
