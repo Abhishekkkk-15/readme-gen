@@ -13,9 +13,9 @@ const sections = [
   { id: 'getting-started', title: 'Getting started' },
   { id: 'cli-installation', title: 'CLI installation' },
   { id: 'web-guide', title: 'Web interface' },
+  { id: 'cli-reference', title: 'CLI reference' },
   { id: 'api-keys', title: 'API keys setup' },
   { id: 'models', title: 'Supported models' },
-  { id: 'pricing', title: 'Pricing & plans' },
   { id: 'faq', title: 'FAQ' },
 ]
 
@@ -70,49 +70,50 @@ export function DocsPage() {
           <section id="getting-started" className="scroll-mt-24">
             <h2 className="text-2xl font-semibold tracking-tight">Getting started</h2>
             <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed">
-              ReadMe Studio generates structured README.md files from your repository metadata, optional
-              uploads, and AI models you choose — hosted keys or your own.
+              Readme gen generates structured README.md files from your repository metadata, optional
+              uploads, and AI models you choose — using your own API keys for full control.
             </p>
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="text-base">Quick start</CardTitle>
-                <CardDescription>Three paths into the same generation engine.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-3">
-                {[
-                  { t: 'Web', d: 'Use the guided wizard with live preview.', href: '/generate' },
-                  { t: 'CLI', d: 'Run locally or in CI with the same templates.', href: '#cli-installation' },
-                  { t: 'API', d: 'Call our REST API on Pro+ (mock in this demo).', href: '/pricing' },
-                ].map((x) => (
-                  <a
-                    key={x.t}
-                    href={x.href}
-                    className="border-border bg-muted/40 hover:border-primary/40 rounded-xl border p-4 transition-colors"
-                  >
-                    <p className="font-medium">{x.t}</p>
-                    <p className="text-muted-foreground mt-1 text-xs">{x.d}</p>
-                  </a>
-                ))}
-              </CardContent>
-            </Card>
+            <div className="mt-8 grid gap-8 md:grid-cols-2">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">1. Install the CLI</h3>
+                <p className="text-muted-foreground text-sm">
+                  Get the latest version of the CLI tool globally.
+                </p>
+                <CodeSnippet language="bash" code="npm install -g @readme-gen/cli" />
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">2. Configure Keys</h3>
+                <p className="text-muted-foreground text-sm">
+                  Initialize your preferred AI provider (Groq, Gemini, or OpenAI).
+                </p>
+                <CodeSnippet language="bash" code="readmegen init" />
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">3. Generate README</h3>
+                <p className="text-muted-foreground text-sm">
+                  Run the generator in your project root. It will analyze your code automatically.
+                </p>
+                <CodeSnippet language="bash" code="readmegen generate" />
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">4. Preview & Refine</h3>
+                <p className="text-muted-foreground text-sm">
+                  Preview the result in your terminal or open the generated file.
+                </p>
+                <CodeSnippet language="bash" code="readmegen preview" />
+              </div>
+            </div>
           </section>
 
           <section id="cli-installation" className="scroll-mt-24">
             <h2 className="text-2xl font-semibold tracking-tight">CLI installation</h2>
             <p className="text-muted-foreground mt-2 text-sm">
-              Install the CLI with your preferred package manager or download a binary.
+              Install the CLI globally with your preferred package manager to use it in any project.
             </p>
             <div className="mt-6 space-y-4">
-              <CodeSnippet title="npm" language="bash" code="npm install -g @readme-studio/cli" />
-              <CodeSnippet title="yarn" language="bash" code="yarn global add @readme-studio/cli" />
-              <CodeSnippet title="pnpm" language="bash" code="pnpm add -g @readme-studio/cli" />
-              <CodeSnippet title="Homebrew" language="bash" code="brew install readme-studio/tap/readme-studio" />
-              <CodeSnippet
-                title="Manual"
-                language="bash"
-                code={`curl -fsSL https://readme.studio/install.sh | bash
-readme-studio --version`}
-              />
+              <CodeSnippet title="npm" language="bash" code="npm install -g @readme-gen/cli" />
+              <CodeSnippet title="yarn" language="bash" code="yarn global add @readme-gen/cli" />
+              <CodeSnippet title="pnpm" language="bash" code="pnpm add -g @readme-gen/cli" />
             </div>
             <Card className="mt-6">
               <CardHeader>
@@ -147,16 +148,29 @@ readme-studio --version`}
           <section id="api-keys" className="scroll-mt-24">
             <h2 className="text-2xl font-semibold tracking-tight">API keys setup</h2>
             <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-              Add provider keys under Account → API keys. Keys are scoped per workspace in production; this
-              demo stores masked values in memory only.
+              Readme gen uses environment variables or a local config file to store your API keys. 
+              Running <code className="bg-muted rounded px-1">readmegen init</code> is the easiest way to set them up.
             </p>
-            <CodeSnippet
-              title="Environment variables (CLI)"
-              language="bash"
-              code={`export OPENAI_API_KEY=sk-...
-export ANTHROPIC_API_KEY=sk-ant-...
-readme-studio generate --repo ./my-app`}
-            />
+            <div className="mt-6 space-y-6">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Using Environment Variables</p>
+                <CodeSnippet
+                  title="bash / zsh"
+                  language="bash"
+                  code={`export GROQ_API_KEY=gsk_...
+export GOOGLE_GENERATIVE_AI_API_KEY=AIza...
+readmegen generate`}
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Using CLI Config</p>
+                <CodeSnippet
+                  title="Interactive Setup"
+                  language="bash"
+                  code="readmegen init"
+                />
+              </div>
+            </div>
           </section>
 
           <section id="models" className="scroll-mt-24">
@@ -167,11 +181,98 @@ readme-studio generate --repo ./my-app`}
             </p>
           </section>
 
-          <section id="pricing" className="scroll-mt-24">
-            <h2 className="text-2xl font-semibold tracking-tight">Pricing & plans</h2>
+          <section id="cli-reference" className="scroll-mt-24">
+            <h2 className="text-2xl font-semibold tracking-tight">CLI commands reference</h2>
             <p className="text-muted-foreground mt-2 text-sm">
-              Compare tiers on the <a className="text-primary underline" href="/pricing">pricing page</a>.
+              Detailed list of all available commands and flags for the <code className="bg-muted rounded px-1">readmegen</code> CLI.
             </p>
+            
+            <div className="mt-8 space-y-10">
+              {/* Init Command */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold font-mono text-primary">readmegen init</h3>
+                </div>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  The primary configuration command. It guides you through selecting an AI provider, setting up your API keys, and picking a default model. 
+                  All settings are stored in a local config file (usually in your user profile).
+                </p>
+              </div>
+
+              {/* Generate Command */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold font-mono text-primary">readmegen generate</h3>
+                </div>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Analyzes your codebase and generates a <code className="bg-muted rounded px-1">README.md</code>. 
+                  It extracts project structure, entry points, dependencies, and business logic to provide context to the AI.
+                </p>
+                
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-muted/50 border-b border-border">
+                      <tr>
+                        <th className="px-4 py-2 font-medium">Flag</th>
+                        <th className="px-4 py-2 font-medium">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {[
+                        { f: '--tone <tone>', d: 'professional, friendly, minimal, enterprise, humorous, concise, etc.' },
+                        { f: '--persona <id>', d: 'Senior Developer | Startup Founder | Educational/Beginner | Open Source Contributor' },
+                        { f: '--provider <id>', d: 'Override default provider: groq, gemini, or openai' },
+                        { f: '--model <id>', d: 'Specific model ID (e.g. gemini-2.0-flash, llama-3.1-70b-versatile)' },
+                        { f: '--mode <mode>', d: 'overwrite (default), rewrite (merges with existing), or append' },
+                        { f: '--output, -o <file>', d: 'Custom filename (default: README.md)' },
+                        { f: '--files <paths...>', d: 'Manually specify important files for deeper AST analysis' },
+                        { f: '--sections <list...>', d: 'Include specific sections: Installation, Usage, API Reference, etc.' },
+                        { f: '--yes, -y', d: 'Skip all interactive prompts (use defaults/flags)' },
+                        { f: '--nested, -n', d: 'Analyze and generate READMEs for sub-directories (Monorepos)' },
+                        { f: '--context <text>', d: 'Provide extra business context or "why" for the generator' },
+                      ].map((flag) => (
+                        <tr key={flag.f}>
+                          <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-primary">{flag.f}</td>
+                          <td className="px-4 py-3 text-muted-foreground leading-relaxed">{flag.d}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Preview Command */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold font-mono text-primary">readmegen preview</h3>
+                </div>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Renders the generated markdown directly in your terminal using a rich text renderer. 
+                  Useful for quick verification before committing.
+                </p>
+              </div>
+
+              {/* Config Command */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold font-mono text-primary">readmegen config</h3>
+                </div>
+                <p className="text-muted-foreground text-sm">Manage CLI settings manually without running full initialization.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    { c: 'view', d: 'Show current configuration' },
+                    { c: 'set-key <key>', d: 'Update API key (use -p for provider)' },
+                    { c: 'set-model <id>', d: 'Change the default default AI model' },
+                    { c: 'reset', d: 'Clear all saved configuration' },
+                  ].map((sub) => (
+                    <div key={sub.c} className="bg-muted/40 rounded-md p-3 border border-border">
+                      <p className="font-mono text-xs font-semibold">readmegen config {sub.c}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{sub.d}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </section>
 
           <section id="faq" className="scroll-mt-24">
@@ -209,11 +310,12 @@ readme-studio generate --repo ./my-app`}
 }
 
 function CliPlayground() {
-  const [cmd, setCmd] = useState('readme-studio generate --repo . --model gpt-4o')
+  const [cmd, setCmd] = useState('readmegen generate --tone professional --persona "Senior Developer"')
   const presets = [
-    'readme-studio generate --repo . --model gpt-4o',
-    'readme-studio import https://github.com/vercel/next.js --sections install,usage,api',
-    'readme-studio doctor',
+    'readmegen init',
+    'readmegen generate --yes',
+    'readmegen preview',
+    'readmegen config view',
   ]
   return (
     <Card className="mt-4">
@@ -238,7 +340,7 @@ function CliPlayground() {
             </button>
           ))}
         </div>
-        <CodeSnippet title="Output (mock)" language="text" code={`$ ${cmd}\n✓ Detected Node.js · MIT license\n✓ Wrote README.md (draft)`} />
+        <CodeSnippet title="Output (mock)" language="text" code={`$ ${cmd}\n✓ Analyzing local codebase...\n✓ Build README (gemini · gemini-2.0-flash)\n✓ Written: ./README.md\n\nQuality score: 92/100`} />
       </CardContent>
     </Card>
   )
