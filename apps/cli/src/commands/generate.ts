@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
+import { Command } from 'commander';
 import {
   evaluateReadmeQuality,
   README_PERSONAS,
@@ -119,6 +120,7 @@ async function promptForReadmeOptions(
   generateNested: boolean,
   allowTemplates: boolean,
   selectedTemplateId?: string,
+  providedFlags?: Set<string>,
 ): Promise<{
   sections: string[];
   tone: string;
@@ -142,6 +144,7 @@ async function promptForReadmeOptions(
         'License',
       ],
       default: ['Installation', 'Usage', 'Features', 'Contributing'],
+      when: !providedFlags?.has('sections'),
     },
     {
       type: 'list',
@@ -158,6 +161,7 @@ async function promptForReadmeOptions(
         'storytelling',
       ],
       default: selectedTone,
+      when: !providedFlags?.has('tone'),
     },
     {
       type: 'list',
@@ -165,12 +169,14 @@ async function promptForReadmeOptions(
       message: 'Select author persona (same options as the web app):',
       choices: PERSONA_CLI_CHOICES,
       default: selectedPersona,
+      when: !providedFlags?.has('persona'),
     },
     {
       type: 'confirm',
       name: 'generateNested',
       message: 'Generate nested READMEs for sub-directories (Monorepos)?',
       default: generateNested,
+      when: !providedFlags?.has('nested'),
     },
   ];
 
@@ -187,10 +193,18 @@ async function promptForReadmeOptions(
         })),
       ],
       default: selectedTemplateId || 'none',
+      when: !providedFlags?.has('template'),
     });
   }
 
-  return await inquirer.prompt(questions);
+  const answers = await inquirer.prompt(questions);
+  return {
+    sections: answers.sections ?? ['Installation', 'Usage', 'Features', 'Contributing'],
+    tone: answers.tone ?? selectedTone,
+    persona: answers.persona ?? selectedPersona,
+    generateNested: answers.generateNested ?? generateNested,
+    templateId: answers.templateId ?? selectedTemplateId,
+  };
 }
 
 async function confirmWrite(
@@ -237,7 +251,8 @@ export async function generateCommand(options: {
   llmDelayMs?: number;
   maxChars?: number;
   mode?: WriteMode;
-}) {
+  sections?: string[];
+}, command: Command) {
   if (!configManager.isConfigured()) {
     console.log(chalk.red('\nCLI is not configured. Run "readmegen init" first.\n'));
     return;
@@ -283,6 +298,13 @@ export async function generateCommand(options: {
       console.log(chalk.yellow(`\nUnknown persona "${selectedPersona}". Expected one of: ${personaHint}\n`));
     }
 
+    const providedFlags = new Set<string>();
+    if (command.getOptionValueSource('tone') === 'cli') providedFlags.add('tone');
+    if (command.getOptionValueSource('persona') === 'cli') providedFlags.add('persona');
+    if (command.getOptionValueSource('nested') === 'cli') providedFlags.add('nested');
+    if (command.getOptionValueSource('template') === 'cli') providedFlags.add('template');
+    if (command.getOptionValueSource('sections') === 'cli') providedFlags.add('sections');
+
     if (!options.yes) {
       const answers = await promptForReadmeOptions(
         selectedTone,
@@ -290,8 +312,9 @@ export async function generateCommand(options: {
         generateNested,
         !forceSemanticFlow,
         selectedTemplate?.id,
+        providedFlags,
       );
-      selectedSections = answers.sections;
+      selectedSections = options.sections || answers.sections;
       selectedTone = answers.tone;
       selectedPersona = answers.persona;
       if (!forceSemanticFlow) {

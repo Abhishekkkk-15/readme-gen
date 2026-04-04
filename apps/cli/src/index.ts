@@ -47,6 +47,7 @@ program
   .option('-y, --yes', 'Automatically answer yes to prompt (non-interactive)')
   .option('-n, --nested', 'Generate nested READMEs for sub-directories (Monorepos)')
   .option('-f, --files <paths...>', 'Manually specify important files for deeper analysis')
+  .option('-s, --sections <sections...>', 'Select sections to include (Installation, Usage, API Reference, Deployment, Architecture, Environment Variables, Contributing, License)')
   .action(generateCommand);
 
 program
