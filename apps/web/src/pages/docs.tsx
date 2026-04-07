@@ -188,6 +188,33 @@ readmegen generate`}
             </p>
             
             <div className="mt-8 space-y-10">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">Global flags</h3>
+                </div>
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-muted/50 border-b border-border">
+                      <tr>
+                        <th className="px-4 py-2 font-medium">Flag</th>
+                        <th className="px-4 py-2 font-medium">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {[
+                        { f: '-h, --help', d: 'Show help for the CLI or a specific command.' },
+                        { f: '-V, --version', d: 'Print the installed CLI version.' },
+                      ].map((flag) => (
+                        <tr key={flag.f}>
+                          <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-primary">{flag.f}</td>
+                          <td className="px-4 py-3 text-muted-foreground leading-relaxed">{flag.d}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               {/* Init Command */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -196,6 +223,9 @@ readmegen generate`}
                 <p className="text-muted-foreground text-sm leading-relaxed">
                   The primary configuration command. It guides you through selecting an AI provider, setting up your API keys, and picking a default model. 
                   All settings are stored in a local config file (usually in your user profile).
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  This command is currently interactive and does not expose command-specific flags.
                 </p>
               </div>
 
@@ -219,17 +249,23 @@ readmegen generate`}
                     </thead>
                     <tbody className="divide-y divide-border">
                       {[
-                        { f: '--tone <tone>', d: 'professional, friendly, minimal, enterprise, humorous, concise, etc.' },
+                        { f: '-t, --tone <tone>', d: 'Set the README tone: professional, friendly, minimal, enterprise, humorous, concise, and more.' },
                         { f: '--persona <id>', d: 'Senior Developer | Startup Founder | Educational/Beginner | Open Source Contributor' },
-                        { f: '--provider <id>', d: 'Override default provider: groq, gemini, or openai' },
+                        { f: '-p, --provider <id>', d: 'Override the semantic provider: groq or gemini.' },
                         { f: '--model <id>', d: 'Specific model ID (e.g. gemini-2.0-flash, llama-3.1-70b-versatile)' },
+                        { f: '--hero <url>', d: 'Attach a hero screenshot or banner image URL to ground the generated README.' },
                         { f: '--mode <mode>', d: 'overwrite (default), rewrite (merges with existing), or append' },
+                        { f: '--template <id>', d: 'Use a built-in backend README template by template id.' },
                         { f: '--output, -o <file>', d: 'Custom filename (default: README.md)' },
-                        { f: '--files <paths...>', d: 'Manually specify important files for deeper AST analysis' },
-                        { f: '--sections <list...>', d: 'Include specific sections: Installation, Usage, API Reference, etc.' },
+                        { f: '-f, --files <paths...>', d: 'Manually specify important files for deeper AST analysis.' },
+                        { f: '-s, --sections <list...>', d: 'Include specific sections: Installation, Usage, API Reference, Deployment, Architecture, Environment Variables, Contributing, License.' },
                         { f: '--yes, -y', d: 'Skip all interactive prompts (use defaults/flags)' },
                         { f: '--nested, -n', d: 'Analyze and generate READMEs for sub-directories (Monorepos)' },
                         { f: '--context <text>', d: 'Provide extra business context or "why" for the generator' },
+                        { f: '--timeout-ms <ms>', d: 'Set the LLM request timeout in milliseconds.' },
+                        { f: '--retries <n>', d: 'Retry transient LLM failures this many times.' },
+                        { f: '--llm-delay-ms <ms>', d: 'Wait at least this many milliseconds between sequential LLM calls.' },
+                        { f: '--max-chars <n>', d: 'Limit characters per evidence chunk before sending context to the model.' },
                       ].map((flag) => (
                         <tr key={flag.f}>
                           <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-primary">{flag.f}</td>
@@ -250,6 +286,9 @@ readmegen generate`}
                   Renders the generated markdown directly in your terminal using a rich text renderer. 
                   Useful for quick verification before committing.
                 </p>
+                <p className="text-muted-foreground text-xs">
+                  This command is currently interactive and does not expose command-specific flags.
+                </p>
               </div>
 
               {/* Config Command */}
@@ -261,8 +300,8 @@ readmegen generate`}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {[
                     { c: 'view', d: 'Show current configuration' },
-                    { c: 'set-key <key>', d: 'Update API key (use -p for provider)' },
-                    { c: 'set-model <id>', d: 'Change the default default AI model' },
+                    { c: 'set-key <key>', d: 'Update API key. Supports `-p, --provider <provider>` for groq, openai, or gemini.' },
+                    { c: 'set-model <id>', d: 'Change the default AI model' },
                     { c: 'reset', d: 'Clear all saved configuration' },
                   ].map((sub) => (
                     <div key={sub.c} className="bg-muted/40 rounded-md p-3 border border-border">
