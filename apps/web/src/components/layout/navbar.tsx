@@ -148,7 +148,7 @@ export function Navbar() {
               "hidden gap-1.5 font-mono text-xs md:inline-flex"
             )}>
             <Terminal className="size-3.5" />
-            <span className="hidden lg:inline">npm i -g @readme-gen/cli</span>
+            <span className="hidden lg:inline">npm i -g @abhishekkkk15/readmegen-cli</span>
             <span className="lg:hidden">CLI</span>
           </Link>
 

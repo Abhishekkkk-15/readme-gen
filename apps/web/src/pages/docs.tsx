@@ -79,7 +79,7 @@ export function DocsPage() {
                 <p className="text-muted-foreground text-sm">
                   Get the latest version of the CLI tool globally.
                 </p>
-                <CodeSnippet language="bash" code="npm install -g @readme-gen/cli" />
+                <CodeSnippet language="bash" code="npm install -g @abhishekkkk15/readmegen-cli" />
               </div>
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">2. Configure Keys</h3>
@@ -111,9 +111,9 @@ export function DocsPage() {
               Install the CLI globally with your preferred package manager to use it in any project.
             </p>
             <div className="mt-6 space-y-4">
-              <CodeSnippet title="npm" language="bash" code="npm install -g @readme-gen/cli" />
-              <CodeSnippet title="yarn" language="bash" code="yarn global add @readme-gen/cli" />
-              <CodeSnippet title="pnpm" language="bash" code="pnpm add -g @readme-gen/cli" />
+              <CodeSnippet title="npm" language="bash" code="npm install -g @abhishekkkk15/readmegen-cli" />
+              <CodeSnippet title="yarn" language="bash" code="yarn global add @abhishekkkk15/readmegen-cli" />
+              <CodeSnippet title="pnpm" language="bash" code="pnpm add -g @abhishekkkk15/readmegen-cli" />
             </div>
             <Card className="mt-6">
               <CardHeader>
