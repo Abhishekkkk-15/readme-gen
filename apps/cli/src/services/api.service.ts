@@ -1,12 +1,13 @@
-import axios from 'axios';
-import { configManager } from '../config/config-manager.js';
-import { ProjectAnalysis } from '@readme-gen/analyzer';
+import axios from "axios";
+import { configManager } from "../config/config-manager.js";
+import { ProjectAnalysis } from "readme-gen-analyzer";
 
 export class ApiService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = configManager.get('apiUrl') || 'http://localhost:5000/api';
+    this.baseUrl =
+      configManager.get("apiUrl") || "https://readme-gen-5uto.onrender.com/api";
   }
 
   public async generateReadme(
@@ -21,29 +22,40 @@ export class ApiService {
       readmeTemplate?: { id?: string; body: string };
       modelId?: string;
       llmDelayMs?: number;
-    } = {},
+    } = {}
   ): Promise<{
     content: string;
     readmes?: { path: string; content: string }[];
     meta?: {
       tokensUsed?: number;
-      executionMode?: 'platform' | 'byok';
+      executionMode?: "platform" | "byok";
       modelId?: string | null;
     };
   }> {
-    const provider = configManager.get('provider');
-    const groqKey = configManager.get('groqKey');
-    const openaiKey = configManager.get('openaiKey');
-    const geminiKey = configManager.get('geminiKey');
+    const provider = configManager.get("provider");
+    const groqKey = configManager.get("groqKey");
+    const openaiKey = configManager.get("openaiKey");
+    const geminiKey = configManager.get("geminiKey");
 
     const apiKey =
-      provider === 'groq' ? groqKey : provider === 'gemini' ? geminiKey : openaiKey;
+      provider === "groq"
+        ? groqKey
+        : provider === "gemini"
+        ? geminiKey
+        : openaiKey;
 
     if (!apiKey) {
-      throw new Error(`API key for ${provider} is not configured. Please run 'readmegen init' or 'config:set-key'.`);
+      throw new Error(
+        `API key for ${provider} is not configured. Please run 'readmegen init' or 'config:set-key'.`
+      );
     }
 
-    const backendProvider = provider === 'groq' ? 'groq' : provider === 'gemini' ? 'gemini' : 'openai';
+    const backendProvider =
+      provider === "groq"
+        ? "groq"
+        : provider === "gemini"
+        ? "gemini"
+        : "openai";
 
     try {
       const response = await axios.post(
@@ -55,9 +67,9 @@ export class ApiService {
           provider: backendProvider,
           modelId: options.modelId,
           analysis,
-          tone: options.tone || 'professional',
-          persona: options.persona || 'Senior Developer',
-          shields: options.shields || ['license', 'stars'],
+          tone: options.tone || "professional",
+          persona: options.persona || "Senior Developer",
+          shields: options.shields || ["license", "stars"],
           generateNested: options.generateNested,
           manualImportantFiles: options.manualImportantFiles,
           readmeTemplate: options.readmeTemplate,
@@ -65,10 +77,10 @@ export class ApiService {
         },
         {
           headers: {
-            'x-api-key': apiKey,
-            'x-provider': backendProvider,
+            "x-api-key": apiKey,
+            "x-provider": backendProvider,
           },
-        },
+        }
       );
 
       return {
@@ -86,7 +98,7 @@ export class ApiService {
     try {
       const response = await axios.post(`${this.baseUrl}/recommendations`, {
         analysis,
-        provider: configManager.get('provider')
+        provider: configManager.get("provider"),
       });
       return response.data;
     } catch (error: any) {

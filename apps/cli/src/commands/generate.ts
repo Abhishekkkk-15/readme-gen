@@ -1,57 +1,65 @@
-import ora from 'ora';
-import chalk from 'chalk';
-import fs from 'fs';
-import path from 'path';
-import inquirer from 'inquirer';
-import { Command } from 'commander';
+import ora from "ora";
+import chalk from "chalk";
+import fs from "fs";
+import path from "path";
+import inquirer from "inquirer";
+import { Command } from "commander";
 import {
   evaluateReadmeQuality,
   README_PERSONAS,
   runSemanticReadmePipeline,
-} from '@readme-gen/analyzer';
-import { LocalAnalyzerService } from '../services/analyzer.service.js';
-import { apiService } from '../services/api.service.js';
-import { configManager } from '../config/config-manager.js';
-import { DEFAULT_PERSONA, PERSONA_CLI_CHOICES } from '../constants/personas.js';
-import { CLI_README_TEMPLATES, findCliTemplate } from '../constants/templates.js';
+} from "readme-gen-analyzer";
+import { LocalAnalyzerService } from "../services/analyzer.service.js";
+import { apiService } from "../services/api.service.js";
+import { configManager } from "../config/config-manager.js";
+import { DEFAULT_PERSONA, PERSONA_CLI_CHOICES } from "../constants/personas.js";
+import {
+  CLI_README_TEMPLATES,
+  findCliTemplate,
+} from "../constants/templates.js";
 
-const personaHint = README_PERSONAS.join(', ');
-type SemanticProvider = 'groq' | 'gemini';
-type WriteMode = 'overwrite' | 'rewrite' | 'append';
+const personaHint = README_PERSONAS.join(", ");
+type SemanticProvider = "groq" | "gemini";
+type WriteMode = "overwrite" | "rewrite" | "append";
 
 function inferProviderFromModel(model?: string): SemanticProvider | undefined {
   const value = model?.trim().toLowerCase();
   if (!value) return undefined;
-  if (value.includes('gemini')) return 'gemini';
+  if (value.includes("gemini")) return "gemini";
   if (
-    value.includes('llama') ||
-    value.includes('mixtral') ||
-    value.includes('qwen') ||
-    value.includes('deepseek') ||
-    value.includes('gemma')
+    value.includes("llama") ||
+    value.includes("mixtral") ||
+    value.includes("qwen") ||
+    value.includes("deepseek") ||
+    value.includes("gemma")
   ) {
-    return 'groq';
+    return "groq";
   }
   return undefined;
 }
 
 function resolveWriteMode(
   requestedMode: string | undefined,
-  hasExistingReadme: boolean,
+  hasExistingReadme: boolean
 ): WriteMode {
-  if (requestedMode === 'overwrite' || requestedMode === 'rewrite' || requestedMode === 'append') {
+  if (
+    requestedMode === "overwrite" ||
+    requestedMode === "rewrite" ||
+    requestedMode === "append"
+  ) {
     return requestedMode;
   }
-  return hasExistingReadme ? 'rewrite' : 'overwrite';
+  return hasExistingReadme ? "rewrite" : "overwrite";
 }
 
 function getSemanticProvider(optionsProvider?: string): SemanticProvider {
-  const configured = configManager.get('provider');
-  const provider = optionsProvider || (configured === 'gemini' ? 'gemini' : 'groq');
-  if (provider !== 'groq' && provider !== 'gemini') {
+  const configured = configManager.get("provider");
+  const provider =
+    optionsProvider || (configured === "gemini" ? "gemini" : "groq");
+  if (provider !== "groq" && provider !== "gemini") {
     throw new Error(
       `Semantic generation supports only groq or gemini. Current provider is "${provider}". ` +
-        `Use \`--provider groq\` or \`--provider gemini\`, or use template/nested mode with the backend flow.`,
+        `Use \`--provider groq\` or \`--provider gemini\`, or use template/nested mode with the backend flow.`
     );
   }
   return provider;
@@ -60,39 +68,51 @@ function getSemanticProvider(optionsProvider?: string): SemanticProvider {
 function getSemanticApiKey(provider: SemanticProvider): string {
   const geminiKey =
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    configManager.get('geminiKey') ||
-    configManager.get('openaiKey') ||
-    '';
-  const groqKey = process.env.GROQ_API_KEY || configManager.get('groqKey') || '';
-  return provider === 'gemini' ? geminiKey : groqKey;
+    configManager.get("geminiKey") ||
+    configManager.get("openaiKey") ||
+    "";
+  const groqKey =
+    process.env.GROQ_API_KEY || configManager.get("groqKey") || "";
+  return provider === "gemini" ? geminiKey : groqKey;
 }
 
-function getSemanticModel(provider: SemanticProvider, requestedModel?: string): string {
-  const configuredModel = configManager.get('model');
+function getSemanticModel(
+  provider: SemanticProvider,
+  requestedModel?: string
+): string {
+  const configuredModel = configManager.get("model");
   const modelOverride = requestedModel?.trim();
-  const defaultGemini = 'gemini-2.5-flash';
-  const defaultGroq = 'llama-3.1-8b-instant';
-  let model = modelOverride || '';
+  const defaultGemini = "gemini-2.5-flash";
+  const defaultGroq = "llama-3.1-8b-instant";
+  let model = modelOverride || "";
 
   if (!model) {
-    const configured = configuredModel || '';
-    const looksGemini = configured.toLowerCase().includes('gemini');
-    if (provider === 'gemini' && looksGemini) model = configured;
-    else if (provider === 'groq' && configured && !looksGemini && !configured.toLowerCase().startsWith('gpt')) {
+    const configured = configuredModel || "";
+    const looksGemini = configured.toLowerCase().includes("gemini");
+    if (provider === "gemini" && looksGemini) model = configured;
+    else if (
+      provider === "groq" &&
+      configured &&
+      !looksGemini &&
+      !configured.toLowerCase().startsWith("gpt")
+    ) {
       model = configured;
     }
   }
 
-  return model || (provider === 'gemini' ? defaultGemini : defaultGroq);
+  return model || (provider === "gemini" ? defaultGemini : defaultGroq);
 }
 
-async function promptForManualFiles(existing: string[] = []): Promise<string[]> {
+async function promptForManualFiles(
+  existing: string[] = []
+): Promise<string[]> {
   if (existing.length > 0) return existing;
   const { addFiles } = await inquirer.prompt([
     {
-      type: 'confirm',
-      name: 'addFiles',
-      message: 'Would you like to manually specify important files for deeper analysis?',
+      type: "confirm",
+      name: "addFiles",
+      message:
+        "Would you like to manually specify important files for deeper analysis?",
       default: false,
     },
   ]);
@@ -101,15 +121,15 @@ async function promptForManualFiles(existing: string[] = []): Promise<string[]> 
 
   const { filesInput } = await inquirer.prompt([
     {
-      type: 'input',
-      name: 'filesInput',
-      message: 'Enter file paths (comma-separated):',
+      type: "input",
+      name: "filesInput",
+      message: "Enter file paths (comma-separated):",
       validate: (input: string) => input.trim().length > 0,
     },
   ]);
 
   return filesInput
-    .split(',')
+    .split(",")
     .map((f: string) => f.trim())
     .filter(Boolean);
 }
@@ -120,7 +140,7 @@ async function promptForReadmeOptions(
   generateNested: boolean,
   allowTemplates: boolean,
   selectedTemplateId?: string,
-  providedFlags?: Set<string>,
+  providedFlags?: Set<string>
 ): Promise<{
   sections: string[];
   tone: string;
@@ -130,76 +150,81 @@ async function promptForReadmeOptions(
 }> {
   const questions: any[] = [
     {
-      type: 'checkbox',
-      name: 'sections',
-      message: 'Select sections to include:',
+      type: "checkbox",
+      name: "sections",
+      message: "Select sections to include:",
       choices: [
-        'Installation',
-        'Usage',
-        'API Reference',
-        'Deployment',
-        'Architecture',
-        'Environment Variables',
-        'Contributing',
-        'License',
+        "Installation",
+        "Usage",
+        "API Reference",
+        "Deployment",
+        "Architecture",
+        "Environment Variables",
+        "Contributing",
+        "License",
       ],
-      default: ['Installation', 'Usage', 'Features', 'Contributing'],
-      when: !providedFlags?.has('sections'),
+      default: ["Installation", "Usage", "Features", "Contributing"],
+      when: !providedFlags?.has("sections"),
     },
     {
-      type: 'list',
-      name: 'tone',
-      message: 'Select README tone:',
+      type: "list",
+      name: "tone",
+      message: "Select README tone:",
       choices: [
-        'professional',
-        'friendly',
-        'minimal',
-        'enterprise',
-        'humorous',
-        'academic',
-        'concise',
-        'storytelling',
+        "professional",
+        "friendly",
+        "minimal",
+        "enterprise",
+        "humorous",
+        "academic",
+        "concise",
+        "storytelling",
       ],
       default: selectedTone,
-      when: !providedFlags?.has('tone'),
+      when: !providedFlags?.has("tone"),
     },
     {
-      type: 'list',
-      name: 'persona',
-      message: 'Select author persona (same options as the web app):',
+      type: "list",
+      name: "persona",
+      message: "Select author persona (same options as the web app):",
       choices: PERSONA_CLI_CHOICES,
       default: selectedPersona,
-      when: !providedFlags?.has('persona'),
+      when: !providedFlags?.has("persona"),
     },
     {
-      type: 'confirm',
-      name: 'generateNested',
-      message: 'Generate nested READMEs for sub-directories (Monorepos)?',
+      type: "confirm",
+      name: "generateNested",
+      message: "Generate nested READMEs for sub-directories (Monorepos)?",
       default: generateNested,
-      when: !providedFlags?.has('nested'),
+      when: !providedFlags?.has("nested"),
     },
   ];
 
   if (allowTemplates) {
     questions.splice(3, 0, {
-      type: 'list',
-      name: 'templateId',
-      message: 'Select a README template:',
+      type: "list",
+      name: "templateId",
+      message: "Select a README template:",
       choices: [
-        { name: 'None (semantic default)', value: 'none' },
+        { name: "None (semantic default)", value: "none" },
         ...CLI_README_TEMPLATES.map((template) => ({
           name: `${template.name} (${template.id})`,
           value: template.id,
         })),
       ],
-      default: selectedTemplateId || 'none',
-      when: !providedFlags?.has('template'),
+      default: selectedTemplateId || "none",
+      when: !providedFlags?.has("template"),
     });
   }
 
   const answers = await inquirer.prompt(questions);
   return {
-    sections: answers.sections ?? ['Installation', 'Usage', 'Features', 'Contributing'],
+    sections: answers.sections ?? [
+      "Installation",
+      "Usage",
+      "Features",
+      "Contributing",
+    ],
     tone: answers.tone ?? selectedTone,
     persona: answers.persona ?? selectedPersona,
     generateNested: answers.generateNested ?? generateNested,
@@ -211,21 +236,21 @@ async function confirmWrite(
   outputPath: string,
   outputLabel: string,
   mode: WriteMode,
-  yes?: boolean,
+  yes?: boolean
 ): Promise<boolean> {
   if (!fs.existsSync(outputPath) || yes) return true;
 
   const message =
-    mode === 'append'
+    mode === "append"
       ? `${outputLabel} already exists. Append new grounded sections into it?`
-      : mode === 'rewrite'
-        ? `${outputLabel} already exists. Improve and rewrite it using the detected README plus code evidence?`
-        : `${outputLabel} already exists. Overwrite?`;
+      : mode === "rewrite"
+      ? `${outputLabel} already exists. Improve and rewrite it using the detected README plus code evidence?`
+      : `${outputLabel} already exists. Overwrite?`;
 
   const { confirm } = await inquirer.prompt([
     {
-      type: 'confirm',
-      name: 'confirm',
+      type: "confirm",
+      name: "confirm",
       message,
       default: false,
     },
@@ -234,27 +259,32 @@ async function confirmWrite(
   return confirm;
 }
 
-export async function generateCommand(options: {
-  tone?: string;
-  persona?: string;
-  output?: string;
-  yes?: boolean;
-  nested?: boolean;
-  files?: string[];
-  template?: string;
-  provider?: SemanticProvider;
-  model?: string;
-  hero?: string;
-  context?: string;
-  timeoutMs?: number;
-  retries?: number;
-  llmDelayMs?: number;
-  maxChars?: number;
-  mode?: WriteMode;
-  sections?: string[];
-}, command: Command) {
+export async function generateCommand(
+  options: {
+    tone?: string;
+    persona?: string;
+    output?: string;
+    yes?: boolean;
+    nested?: boolean;
+    files?: string[];
+    template?: string;
+    provider?: SemanticProvider;
+    model?: string;
+    hero?: string;
+    context?: string;
+    timeoutMs?: number;
+    retries?: number;
+    llmDelayMs?: number;
+    maxChars?: number;
+    mode?: WriteMode;
+    sections?: string[];
+  },
+  command: Command
+) {
   if (!configManager.isConfigured()) {
-    console.log(chalk.red('\nCLI is not configured. Run "readmegen init" first.\n'));
+    console.log(
+      chalk.red('\nCLI is not configured. Run "readmegen init" first.\n')
+    );
     return;
   }
 
@@ -263,7 +293,7 @@ export async function generateCommand(options: {
     manualFiles = await promptForManualFiles(manualFiles);
   }
 
-  const spinner = ora('Analyzing local codebase...').start();
+  const spinner = ora("Analyzing local codebase...").start();
 
   try {
     const analyzer = new LocalAnalyzerService();
@@ -272,38 +302,54 @@ export async function generateCommand(options: {
 
     let selectedSections = analysis.summary.features;
     let selectedTone =
-      options.tone || (configManager.get('provider') === 'groq' ? 'professional' : 'friendly');
+      options.tone ||
+      (configManager.get("provider") === "groq" ? "professional" : "friendly");
     let selectedPersona = options.persona?.trim() || DEFAULT_PERSONA;
     let generateNested = options.nested || false;
     let selectedTemplate = findCliTemplate(options.template);
     const forceSemanticFlow =
-      options.mode === 'rewrite' ||
-      options.mode === 'append' ||
+      options.mode === "rewrite" ||
+      options.mode === "append" ||
       Boolean(options.provider) ||
       Boolean(options.model) ||
       Boolean(options.hero) ||
       Boolean(options.context) ||
-      typeof options.timeoutMs === 'number' ||
-      typeof options.retries === 'number' ||
-      typeof options.llmDelayMs === 'number' ||
-      typeof options.maxChars === 'number';
+      typeof options.timeoutMs === "number" ||
+      typeof options.retries === "number" ||
+      typeof options.llmDelayMs === "number" ||
+      typeof options.maxChars === "number";
 
     if (options.template && !selectedTemplate) {
       throw new Error(
-        `Unknown template "${options.template}". Available IDs: ${CLI_README_TEMPLATES.map((t) => t.id).join(', ')}`,
+        `Unknown template "${
+          options.template
+        }". Available IDs: ${CLI_README_TEMPLATES.map((t) => t.id).join(", ")}`
       );
     }
 
-    if (!README_PERSONAS.includes(selectedPersona as (typeof README_PERSONAS)[number])) {
-      console.log(chalk.yellow(`\nUnknown persona "${selectedPersona}". Expected one of: ${personaHint}\n`));
+    if (
+      !README_PERSONAS.includes(
+        selectedPersona as (typeof README_PERSONAS)[number]
+      )
+    ) {
+      console.log(
+        chalk.yellow(
+          `\nUnknown persona "${selectedPersona}". Expected one of: ${personaHint}\n`
+        )
+      );
     }
 
     const providedFlags = new Set<string>();
-    if (command.getOptionValueSource('tone') === 'cli') providedFlags.add('tone');
-    if (command.getOptionValueSource('persona') === 'cli') providedFlags.add('persona');
-    if (command.getOptionValueSource('nested') === 'cli') providedFlags.add('nested');
-    if (command.getOptionValueSource('template') === 'cli') providedFlags.add('template');
-    if (command.getOptionValueSource('sections') === 'cli') providedFlags.add('sections');
+    if (command.getOptionValueSource("tone") === "cli")
+      providedFlags.add("tone");
+    if (command.getOptionValueSource("persona") === "cli")
+      providedFlags.add("persona");
+    if (command.getOptionValueSource("nested") === "cli")
+      providedFlags.add("nested");
+    if (command.getOptionValueSource("template") === "cli")
+      providedFlags.add("template");
+    if (command.getOptionValueSource("sections") === "cli")
+      providedFlags.add("sections");
 
     if (!options.yes) {
       const answers = await promptForReadmeOptions(
@@ -312,14 +358,14 @@ export async function generateCommand(options: {
         generateNested,
         !forceSemanticFlow,
         selectedTemplate?.id,
-        providedFlags,
+        providedFlags
       );
       selectedSections = options.sections || answers.sections;
       selectedTone = answers.tone;
       selectedPersona = answers.persona;
       if (!forceSemanticFlow) {
         selectedTemplate = findCliTemplate(
-          answers.templateId === 'none' ? undefined : answers.templateId,
+          answers.templateId === "none" ? undefined : answers.templateId
         );
       } else {
         selectedTemplate = undefined;
@@ -327,74 +373,89 @@ export async function generateCommand(options: {
       generateNested = answers.generateNested;
     }
 
-    const outputFile = options.output || 'README.md';
+    const outputFile = options.output || "README.md";
     const outputPath = path.join(process.cwd(), outputFile);
     const writeMode = resolveWriteMode(
       options.mode,
-      Boolean(analysis.summary.existingReadme?.content?.trim()),
+      Boolean(analysis.summary.existingReadme?.content?.trim())
     );
-    const configuredProvider = configManager.get('provider');
-    const inferredProvider = options.provider || inferProviderFromModel(options.model);
+    const configuredProvider = configManager.get("provider");
+    const inferredProvider =
+      options.provider || inferProviderFromModel(options.model);
     const usingLegacyFlow =
       Boolean(selectedTemplate) ||
       generateNested ||
-      (configuredProvider === 'openai' && !inferredProvider);
+      (configuredProvider === "openai" && !inferredProvider);
 
-    if (usingLegacyFlow && options.mode && options.mode !== 'overwrite') {
+    if (usingLegacyFlow && options.mode && options.mode !== "overwrite") {
       throw new Error(
         'README write modes "rewrite" and "append" are available only on the semantic local flow. ' +
-          'Remove `--template` / `--nested`, or switch away from an OpenAI-only backend config.',
+          "Remove `--template` / `--nested`, or switch away from an OpenAI-only backend config."
       );
     }
 
     if (!(await confirmWrite(outputPath, outputFile, writeMode, options.yes))) {
-      console.log(chalk.yellow('\nOperation cancelled. README not saved.\n'));
+      console.log(chalk.yellow("\nOperation cancelled. README not saved.\n"));
       return;
     }
 
     if (usingLegacyFlow) {
-      spinner.start('Generating README via backend flow...');
+      spinner.start("Generating README via backend flow...");
       const result = await apiService.generateReadme(analysis, {
         tone: selectedTone,
         persona: selectedPersona,
         sections: selectedSections,
-        shields: ['license', 'stars', 'version'],
+        shields: ["license", "stars", "version"],
         generateNested,
         manualImportantFiles: manualFiles,
         modelId: options.model,
-        readmeTemplate: selectedTemplate ? { id: selectedTemplate.id, body: selectedTemplate.body } : undefined,
+        readmeTemplate: selectedTemplate
+          ? { id: selectedTemplate.id, body: selectedTemplate.body }
+          : undefined,
         llmDelayMs: options.llmDelayMs ?? 0,
       });
-      spinner.succeed('README generated');
+      spinner.succeed("README generated");
 
-      fs.writeFileSync(outputPath, result.content, 'utf8');
+      fs.writeFileSync(outputPath, result.content, "utf8");
       console.log(chalk.green(`\nWritten: ${outputPath}`));
 
       if (result.readmes && result.readmes.length > 0) {
-        console.log(chalk.blue(`\nFound ${result.readmes.length} nested READMEs to save.`));
+        console.log(
+          chalk.blue(`\nFound ${result.readmes.length} nested READMEs to save.`)
+        );
         for (const file of result.readmes) {
           const fullPath = path.join(process.cwd(), file.path);
           const dir = path.dirname(fullPath);
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          fs.writeFileSync(fullPath, file.content, 'utf8');
+          fs.writeFileSync(fullPath, file.content, "utf8");
           console.log(chalk.green(`  -> Written to ${file.path}`));
         }
       }
 
       if (selectedTemplate) {
-        console.log(chalk.dim(`Template: ${selectedTemplate.name} (${selectedTemplate.id})`));
+        console.log(
+          chalk.dim(
+            `Template: ${selectedTemplate.name} (${selectedTemplate.id})`
+          )
+        );
       }
       if (result.meta) {
         const tokenText =
-          typeof result.meta.tokensUsed === 'number'
+          typeof result.meta.tokensUsed === "number"
             ? result.meta.tokensUsed.toLocaleString()
-            : 'unknown';
+            : "unknown";
         const billingMode =
-          result.meta.executionMode === 'byok' ? 'BYOK' : result.meta.executionMode === 'platform' ? 'platform' : 'unknown';
-        console.log(chalk.dim(`Tokens: ${tokenText} · Billing: ${billingMode}`));
+          result.meta.executionMode === "byok"
+            ? "BYOK"
+            : result.meta.executionMode === "platform"
+            ? "platform"
+            : "unknown";
+        console.log(
+          chalk.dim(`Tokens: ${tokenText} · Billing: ${billingMode}`)
+        );
       }
       console.log(chalk.dim(`Persona: ${selectedPersona}`));
-      console.log(chalk.dim('Flow: backend'));
+      console.log(chalk.dim("Flow: backend"));
       console.log();
       return;
     }
@@ -403,7 +464,7 @@ export async function generateCommand(options: {
     const apiKey = getSemanticApiKey(provider);
     if (!apiKey) {
       throw new Error(
-        `Missing API key for provider "${provider}". Set the matching env var or configure it via \`readmegen init\`.`,
+        `Missing API key for provider "${provider}". Set the matching env var or configure it via \`readmegen init\`.`
       );
     }
 
@@ -423,14 +484,14 @@ export async function generateCommand(options: {
       maxCharsPerChunk: options.maxChars ?? 24_000,
       additionalContext: options.context,
       heroImageUrl: options.hero,
-      tone: selectedTone || 'professional',
+      tone: selectedTone || "professional",
       persona: selectedPersona,
       sections: selectedSections,
       writeMode,
     });
-    spinner.succeed('README generated from semantic JSON');
+    spinner.succeed("README generated from semantic JSON");
 
-    fs.writeFileSync(outputPath, result.readme, 'utf8');
+    fs.writeFileSync(outputPath, result.readme, "utf8");
     console.log(chalk.green(`\nWritten: ${outputPath}`));
 
     const quality = evaluateReadmeQuality(result.readme);
@@ -441,13 +502,24 @@ export async function generateCommand(options: {
 
     console.log(
       chalk.gray(
-        `\nEvidence chunks used: ${result.evidenceChunks.map((c) => `${c.id}~${c.approxTokens}t`).join(', ')}`,
-      ),
+        `\nEvidence chunks used: ${result.evidenceChunks
+          .map((c) => `${c.id}~${c.approxTokens}t`)
+          .join(", ")}`
+      )
     );
-    const estimatedTokens = result.evidenceChunks.reduce((sum, chunk) => sum + chunk.approxTokens, 0);
-    console.log(chalk.dim(`Tokens (estimated): ${estimatedTokens.toLocaleString()}`));
-    console.log(chalk.dim(`Model: ${model} · Persona: ${selectedPersona} · Mode: ${writeMode}`));
-    console.log(chalk.dim('Flow: semantic'));
+    const estimatedTokens = result.evidenceChunks.reduce(
+      (sum, chunk) => sum + chunk.approxTokens,
+      0
+    );
+    console.log(
+      chalk.dim(`Tokens (estimated): ${estimatedTokens.toLocaleString()}`)
+    );
+    console.log(
+      chalk.dim(
+        `Model: ${model} · Persona: ${selectedPersona} · Mode: ${writeMode}`
+      )
+    );
+    console.log(chalk.dim("Flow: semantic"));
     console.log();
   } catch (error: any) {
     spinner.fail(`Error: ${error.message}`);

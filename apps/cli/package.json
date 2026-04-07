@@ -1,12 +1,11 @@
 {
-  "name": "@readme-gen/cli",
+  "name": "@abhishekkkk15/readmegen-cli",
   "version": "1.0.0",
   "description": "Enterprise README Generator CLI",
   "main": "dist/index.js",
   "bin": {
-    "readmegen": "dist/index.js",
-    "devcon": "dist/index.js"
-  },
+    "readmegen": "dist/index.js"
+    },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
@@ -23,7 +22,7 @@
     "inquirer": "^9.2.19",
     "ora": "^8.0.1",
     "ts-morph": "^27.0.2",
-    "@readme-gen/analyzer": "workspace:*"
+    "readme-gen-analyzer": "1.0.0"
   },
   "devDependencies": {
     "@types/inquirer": "^9.0.7",

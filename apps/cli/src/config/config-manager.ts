@@ -1,6 +1,6 @@
-import Conf from 'conf';
+import Conf from "conf";
 
-export type CliProvider = 'groq' | 'openai' | 'gemini';
+export type CliProvider = "groq" | "openai" | "gemini";
 
 export interface ConfigSchema {
   provider: CliProvider;
@@ -13,26 +13,26 @@ export interface ConfigSchema {
 
 const schema: any = {
   provider: {
-    type: 'string',
-    enum: ['groq', 'openai', 'gemini'],
-    default: 'groq',
+    type: "string",
+    enum: ["groq", "openai", "gemini"],
+    default: "groq",
   },
   model: {
-    type: 'string',
-    default: 'llama-3.1-8b-instant',
+    type: "string",
+    default: "llama-3.1-8b-instant",
   },
   groqKey: {
-    type: 'string',
+    type: "string",
   },
   openaiKey: {
-    type: 'string',
+    type: "string",
   },
   geminiKey: {
-    type: 'string',
+    type: "string",
   },
   apiUrl: {
-    type: 'string',
-    default: 'http://localhost:5000/api',
+    type: "string",
+    default: "http://localhost:5000/api",
   },
 };
 
@@ -41,7 +41,7 @@ export class ConfigManager {
 
   constructor() {
     this.conf = new Conf<ConfigSchema>({
-      projectName: 'readmegen',
+      projectName: "readmegen",
       schema,
     });
   }
@@ -50,7 +50,10 @@ export class ConfigManager {
     return this.conf.get(key);
   }
 
-  public set<K extends keyof ConfigSchema>(key: K, value: ConfigSchema[K]): void {
+  public set<K extends keyof ConfigSchema>(
+    key: K,
+    value: ConfigSchema[K]
+  ): void {
     this.conf.set(key, value);
   }
 
@@ -63,10 +66,10 @@ export class ConfigManager {
   }
 
   public isConfigured(): boolean {
-    const provider = this.get('provider');
-    if (provider === 'groq') return Boolean(this.get('groqKey'));
-    if (provider === 'openai') return Boolean(this.get('openaiKey'));
-    if (provider === 'gemini') return Boolean(this.get('geminiKey'));
+    const provider = this.get("provider");
+    if (provider === "groq") return Boolean(this.get("groqKey"));
+    if (provider === "openai") return Boolean(this.get("openaiKey"));
+    if (provider === "gemini") return Boolean(this.get("geminiKey"));
     return false;
   }
 }

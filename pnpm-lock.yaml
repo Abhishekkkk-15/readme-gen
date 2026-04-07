@@ -114,9 +114,6 @@ importers:
 
   apps/cli:
     dependencies:
-      '@readme-gen/analyzer':
-        specifier: workspace:*
-        version: link:../../packages/analyzer
       axios:
         specifier: ^1.14.0
         version: 1.14.0
@@ -144,6 +141,9 @@ importers:
       ora:
         specifier: ^8.0.1
         version: 8.2.0
+      readme-gen-analyzer:
+        specifier: 1.0.0
+        version: 1.0.0
       ts-morph:
         specifier: ^27.0.2
         version: 27.0.2
@@ -3666,6 +3666,9 @@ packages:
   readable-stream@3.6.2:
     resolution: {integrity: sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==}
     engines: {node: '>= 6'}
+
+  readme-gen-analyzer@1.0.0:
+    resolution: {integrity: sha512-B2WppFkufJjzj9aM0Qkh6XTY8LM2GjcVvHO6LATAJeuvcQE/cUXAvmOdDvZofOt+aRS1CY0x3EeWppWk7FhDfQ==}
 
   recast@0.23.11:
     resolution: {integrity: sha512-YTUo+Flmw4ZXiWfQKGcwwc11KnoRAYgzAE2E7mXKCjSviTKShtxBsN6YUUBB2gtaBzKzeKunxhUwNHQuRryhWA==}
@@ -7878,6 +7881,11 @@ snapshots:
       inherits: 2.0.4
       string_decoder: 1.3.0
       util-deprecate: 1.0.2
+
+  readme-gen-analyzer@1.0.0:
+    dependencies:
+      ignore: 7.0.5
+      ts-morph: 27.0.2
 
   recast@0.23.11:
     dependencies:
