@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icon.svg" alt="readme-gen Hero" background-color="blue" width="800">
+  <img src="icon.svg" alt="readme-gen Hero" background-color="blue" width="200">
   
   # 🚀 readme-gen
   
